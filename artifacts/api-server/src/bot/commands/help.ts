@@ -48,6 +48,14 @@ export async function cmdHelp(message: Message): Promise<void> {
         ].join("\n"),
       },
       {
+        name: "🔍 Historial (Solo Owner 👑)",
+        value: [
+          "`Dev conversacion @usuario` — Ver todos los mensajes de un usuario",
+          "`Dev conversacion @usuario filtro:palabra` — Filtrar mensajes por palabra clave",
+          "> Guarda todos los mensajes del servidor, incluyendo los eliminados.",
+        ].join("\n"),
+      },
+      {
         name: "❓ Otros",
         value: ["`Dev help` — Muestra este menú de ayuda"].join("\n"),
       },

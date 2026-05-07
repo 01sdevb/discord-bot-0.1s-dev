@@ -4,6 +4,7 @@ import {
   Partials,
   Message,
   Events,
+  TextChannel,
 } from "discord.js";
 import { logger } from "../lib/logger";
 import { askAI } from "./aiClient";
@@ -18,10 +19,13 @@ import { cmdKick } from "./commands/kick";
 import { cmdUnban } from "./commands/unban";
 import { cmdAntiLink } from "./commands/antilink";
 import { cmdHelp } from "./commands/help";
+import { cmdConversacion } from "./commands/conversacion";
 import { detectJailbreak, getJailbreakResponse } from "./jailbreakDetector";
+import { storeMessage, markDeleted, loadMessages, saveMessages } from "./messageStore";
 
 const PREFIX = "Dev ";
 const AI_CHANNEL_ID = "1502082326270705796";
+const SAVE_INTERVAL_MS = 60 * 1000;
 
 const TWO_WORD_COMMANDS: Record<string, string> = {
   "anti link": "antilink",
@@ -30,12 +34,14 @@ const TWO_WORD_COMMANDS: Record<string, string> = {
   "anti-spam": "antispam",
 };
 
-export function startBot(): void {
+export async function startBot(): Promise<void> {
   const token = process.env["DISCORD_BOT_TOKEN"];
   if (!token) {
     logger.error("DISCORD_BOT_TOKEN no está configurado. El bot no se iniciará.");
     return;
   }
+
+  await loadMessages();
 
   const client = new Client({
     intents: [
@@ -51,16 +57,34 @@ export function startBot(): void {
 
   client.once(Events.ClientReady, (c) => {
     logger.info({ tag: c.user.tag }, "Bot de Discord listo");
+    setInterval(() => {
+      saveMessages().catch((err) => logger.error({ err }, "Auto-save fallido"));
+    }, SAVE_INTERVAL_MS);
   });
 
   client.on(Events.MessageCreate, async (message: Message) => {
     if (message.author.bot) return;
+    if (!message.guild) return;
+
+    const channelName =
+      message.channel instanceof TextChannel ? message.channel.name : "desconocido";
+
+    storeMessage({
+      id: message.id,
+      userId: message.author.id,
+      username: message.author.username,
+      tag: message.author.tag,
+      channelId: message.channel.id,
+      channelName,
+      guildId: message.guild.id,
+      content: message.content,
+      timestamp: message.createdTimestamp,
+    });
 
     await handleAntiLink(message);
     await handleAntiSpam(message);
 
     const content = message.content;
-
     if (!content.startsWith(PREFIX)) return;
 
     const withoutPrefix = content.slice(PREFIX.length).trim();
@@ -123,8 +147,13 @@ export function startBot(): void {
         case "antispam": {
           await message.reply(
             `🛡️ **Anti-Spam** — Siempre activo.\n` +
-            `Si un usuario envía **3 mensajes seguidos** en menos de 5 segundos, recibirá un **timeout de 28 días** y sus mensajes serán eliminados.`
+              `Si un usuario envía **3 mensajes seguidos** en menos de 5 segundos, recibirá un **timeout de 28 días** y sus mensajes serán eliminados.`,
           );
+          break;
+        }
+
+        case "conversacion": {
+          await cmdConversacion(message, args);
           break;
         }
 
@@ -150,9 +179,7 @@ export function startBot(): void {
 
             addMessage(userId, channelId, "user", fullQuery);
             const history = getHistory(userId, channelId);
-
             const response = await askAI(fullQuery, history);
-
             addMessage(userId, channelId, "model", response);
 
             await message.reply(response);
@@ -168,7 +195,31 @@ export function startBot(): void {
     }
   });
 
+  client.on(Events.MessageDelete, async (message) => {
+    if (!message.guild) return;
+    markDeleted(message.guild.id, message.id);
+  });
+
+  client.on(Events.MessageBulkDelete, async (messages) => {
+    for (const [, message] of messages) {
+      if (!message.guild) continue;
+      markDeleted(message.guild.id, message.id);
+    }
+  });
+
+  process.on("SIGTERM", async () => {
+    logger.info("SIGTERM recibido, guardando mensajes...");
+    await saveMessages();
+    process.exit(0);
+  });
+
+  process.on("SIGINT", async () => {
+    logger.info("SIGINT recibido, guardando mensajes...");
+    await saveMessages();
+    process.exit(0);
+  });
+
   client.login(token).catch((err) => {
-    logger.error({ err }, "No se pudo conectar el bot de Discord. Verifica el token.");
+    logger.error({ err }, "No se pudo conectar el bot de Discord.");
   });
 }
