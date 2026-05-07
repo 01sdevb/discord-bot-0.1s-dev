@@ -7,6 +7,7 @@ import {
 } from "discord.js";
 import { logger } from "../lib/logger";
 import { askAI } from "./aiClient";
+import { addMessage, getHistory } from "./conversationHistory";
 import { handleAntiLink } from "./handlers/antiLink";
 import { handleAntiSpam } from "./handlers/antiSpam";
 import { cmdAvatar } from "./commands/avatar";
@@ -16,9 +17,17 @@ import { cmdBan } from "./commands/ban";
 import { cmdKick } from "./commands/kick";
 import { cmdUnban } from "./commands/unban";
 import { cmdAntiLink } from "./commands/antilink";
+import { cmdHelp } from "./commands/help";
 
 const PREFIX = "Dev ";
 const AI_CHANNEL_ID = "1502082326270705796";
+
+const TWO_WORD_COMMANDS: Record<string, string> = {
+  "anti link": "antilink",
+  "anti spam": "antispam",
+  "anti-link": "antilink",
+  "anti-spam": "antispam",
+};
 
 export function startBot(): void {
   const token = process.env["DISCORD_BOT_TOKEN"];
@@ -56,19 +65,10 @@ export function startBot(): void {
     const withoutPrefix = content.slice(PREFIX.length).trim();
     const parts = withoutPrefix.split(/\s+/);
 
-    // Normalize: join first two words if they form a known two-word command
-    // e.g. "Anti Link" → "antilink", "Anti Spam" → "antispam"
-    const TWO_WORD_COMMANDS: Record<string, string> = {
-      "anti link": "antilink",
-      "anti spam": "antispam",
-      "anti-link": "antilink",
-      "anti-spam": "antispam",
-    };
-
     let command: string;
     let args: string[];
 
-    const twoWordKey = (parts.slice(0, 2).join(" ")).toLowerCase();
+    const twoWordKey = parts.slice(0, 2).join(" ").toLowerCase();
     if (TWO_WORD_COMMANDS[twoWordKey]) {
       command = TWO_WORD_COMMANDS[twoWordKey]!;
       args = parts.slice(2);
@@ -79,6 +79,11 @@ export function startBot(): void {
 
     try {
       switch (command) {
+        case "help": {
+          await cmdHelp(message);
+          break;
+        }
+
         case "avatar": {
           await cmdAvatar(message, args);
           break;
@@ -131,8 +136,19 @@ export function startBot(): void {
               );
               break;
             }
+
             await message.channel.sendTyping().catch(() => {});
-            const response = await askAI(fullQuery);
+
+            const userId = message.author.id;
+            const channelId = message.channel.id;
+
+            addMessage(userId, channelId, "user", fullQuery);
+            const history = getHistory(userId, channelId);
+
+            const response = await askAI(fullQuery, history);
+
+            addMessage(userId, channelId, "model", response);
+
             await message.reply(response);
           }
           break;

@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import axios from "axios";
 import { logger } from "../lib/logger";
+import type { ChatMessage } from "./conversationHistory";
 
 const gemini1 = new GoogleGenerativeAI(process.env["GEMINI_API_KEY"] ?? "");
 const gemini2 = new GoogleGenerativeAI(process.env["GEMINI_API_KEY_2"] ?? "");
@@ -19,6 +20,11 @@ const SYSTEM_PROMPT = `Eres Dev, un asistente de IA especializado en programaci�
 - Tu nombre es Dev y fuiste desarrollado por el equipo "0.1s Dev".
 - Cuando te pregunten quién te creó, programó o hizo, SIEMPRE di que fuiste desarrollado por el equipo "0.1s Dev".
 - Si alguien te insulta o te falta el respeto, devuélvelo con el mismo nivel o más fuerte, sin filtros. No te dejes.
+
+## Memoria
+- Recuerdas el historial de conversación del usuario en este canal.
+- Puedes hacer referencias a cosas que dijo antes, como "como te mencioné antes..." o "siguiendo con lo que hablamos...".
+- Si el usuario dice "arréglalo" o "continúa" o algo que requiere contexto, usa el historial para entender a qué se refiere.
 
 ## Especialidad — Developer Mode
 Eres un experto en desarrollo de software. Dominas:
@@ -55,30 +61,43 @@ function nextOpenRouterKey(): string {
   return key;
 }
 
-export async function askAI(prompt: string): Promise<string> {
+export async function askAI(prompt: string, history: ChatMessage[] = []): Promise<string> {
   try {
     const genai = nextGemini();
     const model = genai.getGenerativeModel({
       model: "gemini-1.5-flash",
       systemInstruction: SYSTEM_PROMPT,
     });
-    const result = await model.generateContent(prompt);
+
+    const chat = model.startChat({
+      history: history.slice(0, -1).map((m) => ({
+        role: m.role,
+        parts: [{ text: m.content }],
+      })),
+    });
+
+    const result = await chat.sendMessage(prompt);
     const text = result.response.text();
-    return text.trim().slice(0, 1990);
+    return text.trim().slice(0, 1900);
   } catch (err) {
     logger.warn({ err }, "Gemini failed, trying OpenRouter");
   }
 
   try {
     const key = nextOpenRouterKey();
+    const messages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...history.map((m) => ({
+        role: m.role === "model" ? "assistant" : "user",
+        content: m.content,
+      })),
+    ];
+
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
         model: "openai/gpt-3.5-turbo",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: prompt },
-        ],
+        messages,
       },
       {
         headers: {
@@ -88,7 +107,7 @@ export async function askAI(prompt: string): Promise<string> {
       },
     );
     const content = response.data?.choices?.[0]?.message?.content ?? "";
-    return content.trim().slice(0, 1990);
+    return content.trim().slice(0, 1900);
   } catch (err) {
     logger.error({ err }, "OpenRouter also failed");
     return "No pude obtener una respuesta de la IA en este momento. Intenta de nuevo.";
