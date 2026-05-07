@@ -18,6 +18,7 @@ import { cmdKick } from "./commands/kick";
 import { cmdUnban } from "./commands/unban";
 import { cmdAntiLink } from "./commands/antilink";
 import { cmdHelp } from "./commands/help";
+import { detectJailbreak, getJailbreakResponse } from "./jailbreakDetector";
 
 const PREFIX = "Dev ";
 const AI_CHANNEL_ID = "1502082326270705796";
@@ -134,6 +135,11 @@ export function startBot(): void {
               await message.reply(
                 `🤖 Las preguntas a la IA solo se pueden hacer en <#${AI_CHANNEL_ID}>.\n¡Ve allá y pregunta lo que quieras!`,
               );
+              break;
+            }
+
+            if (detectJailbreak(fullQuery)) {
+              await message.reply(getJailbreakResponse());
               break;
             }
 
