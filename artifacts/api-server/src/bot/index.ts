@@ -18,6 +18,7 @@ import { cmdUnban } from "./commands/unban";
 import { cmdAntiLink } from "./commands/antilink";
 
 const PREFIX = "Dev ";
+const AI_CHANNEL_ID = "1502082326270705796";
 
 export function startBot(): void {
   const token = process.env["DISCORD_BOT_TOKEN"];
@@ -124,7 +125,13 @@ export function startBot(): void {
         default: {
           const fullQuery = withoutPrefix;
           if (fullQuery.length > 0) {
-            const typing = await message.channel.sendTyping().catch(() => {});
+            if (message.channel.id !== AI_CHANNEL_ID) {
+              await message.reply(
+                `🤖 Las preguntas a la IA solo se pueden hacer en <#${AI_CHANNEL_ID}>.\n¡Ve allá y pregunta lo que quieras!`,
+              );
+              break;
+            }
+            await message.channel.sendTyping().catch(() => {});
             const response = await askAI(fullQuery);
             await message.reply(response);
           }
