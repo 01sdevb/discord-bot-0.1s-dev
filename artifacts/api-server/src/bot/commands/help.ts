@@ -50,9 +50,10 @@ export async function cmdHelp(message: Message): Promise<void> {
       {
         name: "🔍 Historial (Solo Owner 👑)",
         value: [
-          "`Dev conversacion @usuario` — Ver todos los mensajes de un usuario",
-          "`Dev conversacion @usuario filtro:palabra` — Filtrar mensajes por palabra clave",
-          "> Guarda todos los mensajes del servidor, incluyendo los eliminados.",
+          "`Dev con @usuario` — Historial de mensajes de un usuario",
+          "`Dev con @usuario filtro:estafar` — Filtrar por palabra clave",
+          "`Dev con gen filtro:estafar` — Buscar en TODO el servidor",
+          "> Alias largo: `Dev conversacion`. Guarda mensajes del servidor incluyendo eliminados.",
         ].join("\n"),
       },
       {

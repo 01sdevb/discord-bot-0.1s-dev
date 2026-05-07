@@ -81,3 +81,16 @@ export function getUserMessages(
   }
   return results.sort((a, b) => a.timestamp - b.timestamp);
 }
+
+export function getGeneralMessages(
+  guildId: string,
+  filter?: string,
+): StoredMessage[] {
+  const guildMsgs = messagesByGuild.get(guildId) ?? [];
+  let results = guildMsgs.filter((m) => m.content.trim().length > 0);
+  if (filter) {
+    const lower = filter.toLowerCase();
+    results = results.filter((m) => m.content.toLowerCase().includes(lower));
+  }
+  return results.sort((a, b) => a.timestamp - b.timestamp);
+}

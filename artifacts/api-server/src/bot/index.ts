@@ -152,7 +152,8 @@ export async function startBot(): Promise<void> {
           break;
         }
 
-        case "conversacion": {
+        case "conversacion":
+        case "con": {
           await cmdConversacion(message, args);
           break;
         }
