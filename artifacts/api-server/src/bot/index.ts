@@ -54,8 +54,27 @@ export function startBot(): void {
 
     const withoutPrefix = content.slice(PREFIX.length).trim();
     const parts = withoutPrefix.split(/\s+/);
-    const command = parts[0]?.toLowerCase() ?? "";
-    const args = parts.slice(1);
+
+    // Normalize: join first two words if they form a known two-word command
+    // e.g. "Anti Link" → "antilink", "Anti Spam" → "antispam"
+    const TWO_WORD_COMMANDS: Record<string, string> = {
+      "anti link": "antilink",
+      "anti spam": "antispam",
+      "anti-link": "antilink",
+      "anti-spam": "antispam",
+    };
+
+    let command: string;
+    let args: string[];
+
+    const twoWordKey = (parts.slice(0, 2).join(" ")).toLowerCase();
+    if (TWO_WORD_COMMANDS[twoWordKey]) {
+      command = TWO_WORD_COMMANDS[twoWordKey]!;
+      args = parts.slice(2);
+    } else {
+      command = parts[0]?.toLowerCase() ?? "";
+      args = parts.slice(1);
+    }
 
     try {
       switch (command) {
@@ -91,6 +110,14 @@ export function startBot(): void {
 
         case "antilink": {
           await cmdAntiLink(message, args);
+          break;
+        }
+
+        case "antispam": {
+          await message.reply(
+            `🛡️ **Anti-Spam** — Siempre activo.\n` +
+            `Si un usuario envía **3 mensajes seguidos** en menos de 5 segundos, recibirá un **timeout de 28 días** y sus mensajes serán eliminados.`
+          );
           break;
         }
 
