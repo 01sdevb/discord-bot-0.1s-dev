@@ -175,7 +175,7 @@ export async function startBot(): Promise<void> {
             break;
           }
 
-          await message.channel.sendTyping().catch(() => {});
+          if ("sendTyping" in message.channel) await (message.channel as TextChannel).sendTyping().catch(() => {});
           addMessage(message.author.id, message.channel.id, "user", withoutPrefix);
           const history = getHistory(message.author.id, message.channel.id);
           const response = await askAI(withoutPrefix, history);

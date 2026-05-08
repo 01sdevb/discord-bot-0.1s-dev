@@ -1,4 +1,4 @@
-import { Message, AttachmentBuilder } from "discord.js";
+import { Message, AttachmentBuilder, TextChannel } from "discord.js";
 import { findRelevantScripts, getScriptCount, getAllScripts } from "../scriptStore";
 import { askScriptAI } from "../aiClient";
 
@@ -68,7 +68,7 @@ export async function cmdScriptGen(message: Message, args: string[]): Promise<vo
     return;
   }
 
-  await message.channel.sendTyping().catch(() => {});
+  if ("sendTyping" in message.channel) await (message.channel as TextChannel).sendTyping().catch(() => {});
 
   const { code, fromStore } = await buildScript(request);
 
@@ -94,7 +94,7 @@ export async function handleScriptChannel(message: Message): Promise<void> {
   const request = content.slice(prefix.length).trim();
   if (!request) return;
 
-  await message.channel.sendTyping().catch(() => {});
+  if ("sendTyping" in message.channel) await (message.channel as TextChannel).sendTyping().catch(() => {});
 
   const { code, fromStore } = await buildScript(request);
 
