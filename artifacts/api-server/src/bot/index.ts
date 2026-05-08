@@ -5,6 +5,8 @@ import {
   Message,
   Events,
   TextChannel,
+  ButtonInteraction,
+  Interaction,
 } from "discord.js";
 import { logger } from "../lib/logger";
 import { askAI } from "./aiClient";
@@ -20,8 +22,12 @@ import { cmdUnban } from "./commands/unban";
 import { cmdAntiLink } from "./commands/antilink";
 import { cmdHelp } from "./commands/help";
 import { cmdConversacion } from "./commands/conversacion";
+import { cmdWarn, cmdWarns, cmdWarnClear } from "./commands/warn";
+import { cmdTimeout } from "./commands/timeout";
+import { cmdTicketpa, handleTicketCreate, handleTicketClose, handleTicketDelete } from "./commands/ticketpa";
 import { detectJailbreak, getJailbreakResponse } from "./jailbreakDetector";
 import { storeMessage, markDeleted, loadMessages, saveMessages } from "./messageStore";
+import { loadTickets } from "./ticketStore";
 
 const PREFIX = "Dev ";
 const AI_CHANNEL_ID = "1502082326270705796";
@@ -32,16 +38,18 @@ const TWO_WORD_COMMANDS: Record<string, string> = {
   "anti spam": "antispam",
   "anti-link": "antilink",
   "anti-spam": "antispam",
+  "warn clear": "warnclear",
 };
 
 export async function startBot(): Promise<void> {
   const token = process.env["DISCORD_BOT_TOKEN"];
   if (!token) {
-    logger.error("DISCORD_BOT_TOKEN no está configurado. El bot no se iniciará.");
+    logger.error("DISCORD_BOT_TOKEN no está configurado.");
     return;
   }
 
   await loadMessages();
+  await loadTickets();
 
   const client = new Client({
     intents: [
@@ -66,9 +74,7 @@ export async function startBot(): Promise<void> {
     if (message.author.bot) return;
     if (!message.guild) return;
 
-    const channelName =
-      message.channel instanceof TextChannel ? message.channel.name : "desconocido";
-
+    const channelName = message.channel instanceof TextChannel ? message.channel.name : "desconocido";
     storeMessage({
       id: message.id,
       userId: message.author.id,
@@ -104,123 +110,88 @@ export async function startBot(): Promise<void> {
 
     try {
       switch (command) {
-        case "help": {
-          await cmdHelp(message);
-          break;
-        }
-
-        case "avatar": {
-          await cmdAvatar(message, args);
-          break;
-        }
-
-        case "av": {
-          await cmdAv(message, args);
-          break;
-        }
-
-        case "banner": {
-          await cmdBanner(message, args);
-          break;
-        }
-
-        case "ban": {
-          await cmdBan(message, args);
-          break;
-        }
-
-        case "kick": {
-          await cmdKick(message, args);
-          break;
-        }
-
-        case "unban": {
-          await cmdUnban(message, args);
-          break;
-        }
-
-        case "antilink": {
-          await cmdAntiLink(message, args);
-          break;
-        }
+        case "help":        { await cmdHelp(message); break; }
+        case "avatar":      { await cmdAvatar(message, args); break; }
+        case "av":          { await cmdAv(message, args); break; }
+        case "banner":      { await cmdBanner(message, args); break; }
+        case "ban":         { await cmdBan(message, args); break; }
+        case "kick":        { await cmdKick(message, args); break; }
+        case "unban":       { await cmdUnban(message, args); break; }
+        case "warn":        { await cmdWarn(message, args); break; }
+        case "warns":       { await cmdWarns(message, args); break; }
+        case "warnclear":   { await cmdWarnClear(message, args); break; }
+        case "timeout":     { await cmdTimeout(message, args); break; }
+        case "ticketpa":    { await cmdTicketpa(message); break; }
+        case "antilink":    { await cmdAntiLink(message, args); break; }
+        case "conversacion":
+        case "con":         { await cmdConversacion(message, args); break; }
 
         case "antispam": {
           await message.reply(
-            `🛡️ **Anti-Spam** — Siempre activo.\n` +
-              `Si un usuario envía **3 mensajes seguidos** en menos de 5 segundos, recibirá un **timeout de 28 días** y sus mensajes serán eliminados.`,
+            `🛡️ **Anti-Spam** — Siempre activo.\nSi un usuario envía **3 mensajes seguidos** en menos de 5 segundos recibe timeout de **28 días** y sus mensajes se eliminan.`
           );
-          break;
-        }
-
-        case "conversacion":
-        case "con": {
-          await cmdConversacion(message, args);
           break;
         }
 
         default: {
           const fullQuery = withoutPrefix;
-          if (fullQuery.length > 0) {
-            if (message.channel.id !== AI_CHANNEL_ID) {
-              await message.reply(
-                `🤖 Las preguntas a la IA solo se pueden hacer en <#${AI_CHANNEL_ID}>.\n¡Ve allá y pregunta lo que quieras!`,
-              );
-              break;
-            }
+          if (!fullQuery) break;
 
-            if (detectJailbreak(fullQuery)) {
-              await message.reply(getJailbreakResponse());
-              break;
-            }
-
-            await message.channel.sendTyping().catch(() => {});
-
-            const userId = message.author.id;
-            const channelId = message.channel.id;
-
-            addMessage(userId, channelId, "user", fullQuery);
-            const history = getHistory(userId, channelId);
-            const response = await askAI(fullQuery, history);
-            addMessage(userId, channelId, "model", response);
-
-            await message.reply(response);
+          if (message.channel.id !== AI_CHANNEL_ID) {
+            await message.reply(`🤖 Las preguntas a la IA solo se pueden hacer en <#${AI_CHANNEL_ID}>.\n¡Ve allá y pregunta lo que quieras!`);
+            break;
           }
+
+          if (detectJailbreak(fullQuery)) {
+            await message.reply(getJailbreakResponse());
+            break;
+          }
+
+          await message.channel.sendTyping().catch(() => {});
+          addMessage(message.author.id, message.channel.id, "user", fullQuery);
+          const history = getHistory(message.author.id, message.channel.id);
+          const response = await askAI(fullQuery, history);
+          addMessage(message.author.id, message.channel.id, "model", response);
+          await message.reply(response);
           break;
         }
       }
     } catch (err) {
       logger.error({ err, command }, "Error ejecutando comando");
-      try {
-        await message.reply("❌ Ocurrió un error al ejecutar el comando.");
-      } catch {}
+      try { await message.reply("❌ Ocurrió un error al ejecutar el comando."); } catch {}
     }
   });
 
   client.on(Events.MessageDelete, async (message) => {
-    if (!message.guild) return;
-    markDeleted(message.guild.id, message.id);
+    if (message.guild) markDeleted(message.guild.id, message.id);
   });
 
   client.on(Events.MessageBulkDelete, async (messages) => {
     for (const [, message] of messages) {
-      if (!message.guild) continue;
-      markDeleted(message.guild.id, message.id);
+      if (message.guild) markDeleted(message.guild.id, message.id);
     }
   });
 
-  process.on("SIGTERM", async () => {
-    logger.info("SIGTERM recibido, guardando mensajes...");
-    await saveMessages();
-    process.exit(0);
+  client.on(Events.InteractionCreate, async (interaction: Interaction) => {
+    if (!interaction.isButton()) return;
+    const btn = interaction as ButtonInteraction;
+
+    try {
+      if (btn.customId.startsWith("ticketCreate_")) {
+        await handleTicketCreate(btn);
+      } else if (btn.customId.startsWith("ticketClose_")) {
+        await handleTicketClose(btn);
+      } else if (btn.customId.startsWith("ticketDelete_")) {
+        await handleTicketDelete(btn);
+      }
+    } catch (err) {
+      logger.error({ err, customId: btn.customId }, "Error en interacción de botón");
+      try { await btn.reply({ content: "❌ Error al procesar la acción.", ephemeral: true }); } catch {}
+    }
   });
 
-  process.on("SIGINT", async () => {
-    logger.info("SIGINT recibido, guardando mensajes...");
-    await saveMessages();
-    process.exit(0);
-  });
+  process.on("SIGTERM", async () => { await saveMessages(); process.exit(0); });
+  process.on("SIGINT",  async () => { await saveMessages(); process.exit(0); });
 
-  client.login(token).catch((err) => {
-    logger.error({ err }, "No se pudo conectar el bot de Discord.");
-  });
+  client.login(token).catch((err) => logger.error({ err }, "No se pudo conectar el bot."));
 }
