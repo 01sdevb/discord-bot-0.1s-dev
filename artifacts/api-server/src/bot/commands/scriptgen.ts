@@ -1,13 +1,5 @@
 import { Message, AttachmentBuilder, TextChannel } from "discord.js";
-import { findRelevantScripts, getScriptCount, getAllScripts } from "../scriptStore";
-import { askScriptAI } from "../aiClient";
-
-const SCRIPT_CHANNEL_ID = "1502064878377111773";
-const HEADER = "--script generate for Dev | https://develol.com";
-
-export function isScriptChannel(channelId: string): boolean {
-  return channelId === SCRIPT_CHANNEL_ID;
-}
+import { getAllScripts, getScriptCount } from "../scriptStore";
 
 function findBestScript(request: string): string | null {
   const scripts = getAllScripts();
@@ -40,6 +32,13 @@ function findBestScript(request: string): string | null {
   return bestScore > 0 ? bestContent : null;
 }
 
+const SCRIPT_CHANNEL_ID = "1502064878377111773";
+const HEADER = "--script generate for Dev | https://develol.com";
+
+export function isScriptChannel(channelId: string): boolean {
+  return channelId === SCRIPT_CHANNEL_ID;
+}
+
 async function buildScript(request: string): Promise<{ code: string; fromStore: boolean }> {
   const count = getScriptCount();
 
@@ -50,9 +49,10 @@ async function buildScript(request: string): Promise<{ code: string; fromStore: 
     }
   }
 
-  const context = findRelevantScripts(request);
-  const aiCode = await askScriptAI(request, context);
-  return { code: aiCode, fromStore: false };
+  return {
+    code: `${HEADER}\n\n-- No se encontró un script para esa solicitud en la librería.`,
+    fromStore: false,
+  };
 }
 
 export async function cmdScriptGen(message: Message, args: string[]): Promise<void> {

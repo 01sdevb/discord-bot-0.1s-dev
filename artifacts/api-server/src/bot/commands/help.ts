@@ -7,13 +7,6 @@ export async function cmdHelp(message: Message): Promise<void> {
     .setDescription("Usa el prefijo **`Dev `** antes de cada comando.")
     .addFields(
       {
-        name: "🤖 Inteligencia Artificial",
-        value: [
-          "`Dev <pregunta>` — Pregunta a la IA (solo en <#1502082326270705796>)",
-          "> Especializada en programación. Recuerda tu historial de conversación.",
-        ].join("\n"),
-      },
-      {
         name: "🔗 Anti-Link",
         value: [
           "`Dev Anti Link on/off` — Activa/desactiva (solo admins)",

@@ -9,8 +9,6 @@ import {
   Interaction,
 } from "discord.js";
 import { logger } from "../lib/logger";
-import { askAI } from "./aiClient";
-import { addMessage, getHistory } from "./conversationHistory";
 import { handleAntiLink } from "./handlers/antiLink";
 import { handleAntiSpam } from "./handlers/antiSpam";
 import { cmdAvatar } from "./commands/avatar";
@@ -33,7 +31,6 @@ import { loadScripts, syncScriptsFromChannel } from "./scriptStore";
 import { initModLogger } from "./modLogger";
 
 const PREFIX = "Dev ";
-const AI_CHANNEL_ID = "1502082326270705796";
 const SCRIPTS_UPLOAD_CHANNEL_ID = "1502143146027646976";
 const SAVE_INTERVAL_MS = 60 * 1000;
 const SYNC_SCRIPTS_INTERVAL_MS = 30 * 60 * 1000;
@@ -167,22 +164,7 @@ export async function startBot(): Promise<void> {
           break;
         }
 
-        default: {
-          if (!withoutPrefix) break;
-
-          if (message.channel.id !== AI_CHANNEL_ID) {
-            await message.reply(`🤖 Las preguntas a la IA solo se pueden hacer en <#${AI_CHANNEL_ID}>.`);
-            break;
-          }
-
-          if ("sendTyping" in message.channel) await (message.channel as TextChannel).sendTyping().catch(() => {});
-          addMessage(message.author.id, message.channel.id, "user", withoutPrefix);
-          const history = getHistory(message.author.id, message.channel.id);
-          const response = await askAI(withoutPrefix, history);
-          addMessage(message.author.id, message.channel.id, "model", response);
-          await message.reply(response);
-          break;
-        }
+        default: break;
       }
     } catch (err) {
       logger.error({ err, command }, "Error ejecutando comando");
