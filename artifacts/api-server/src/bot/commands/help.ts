@@ -84,6 +84,14 @@ export async function cmdHelp(message: Message): Promise<void> {
         ].join("\n"),
       },
       {
+        name: "🎮 Dev Gen — Steal and Brainrot",
+        value: [
+          "`Dev gen` — Genera un servidor privado del juego (solo en el canal asignado)",
+          "> 1 generación por usuario cada **5 días**.",
+          "> El mensaje con el link se elimina automáticamente al expirar.",
+        ].join("\n"),
+      },
+      {
         name: "❓ Otros",
         value: ["`Dev help` — Muestra este menú"].join("\n"),
       },
