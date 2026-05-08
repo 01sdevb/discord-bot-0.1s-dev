@@ -25,14 +25,19 @@ import { cmdConversacion } from "./commands/conversacion";
 import { cmdWarn, cmdWarns, cmdWarnClear } from "./commands/warn";
 import { cmdTimeout } from "./commands/timeout";
 import { cmdTicketpa, handleTicketCreate, handleTicketClose, handleTicketDelete } from "./commands/ticketpa";
+import { cmdAll } from "./commands/all";
+import { cmdScriptGen, handleScriptChannel, isScriptChannel } from "./commands/scriptgen";
 import { detectJailbreak, getJailbreakResponse } from "./jailbreakDetector";
 import { storeMessage, markDeleted, loadMessages, saveMessages } from "./messageStore";
 import { loadTickets } from "./ticketStore";
+import { loadScripts, syncScriptsFromChannel } from "./scriptStore";
 import { initModLogger, modLog } from "./modLogger";
 
 const PREFIX = "Dev ";
 const AI_CHANNEL_ID = "1502082326270705796";
+const SCRIPTS_UPLOAD_CHANNEL_ID = "1502143146027646976";
 const SAVE_INTERVAL_MS = 60 * 1000;
+const SYNC_SCRIPTS_INTERVAL_MS = 30 * 60 * 1000;
 
 const TWO_WORD_COMMANDS: Record<string, string> = {
   "anti link": "antilink",
@@ -51,6 +56,7 @@ export async function startBot(): Promise<void> {
 
   await loadMessages();
   await loadTickets();
+  await loadScripts();
 
   const client = new Client({
     intents: [
@@ -64,12 +70,20 @@ export async function startBot(): Promise<void> {
     partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
   });
 
-  client.once(Events.ClientReady, (c) => {
+  client.once(Events.ClientReady, async (c) => {
     logger.info({ tag: c.user.tag }, "Bot de Discord listo");
     initModLogger(client);
+
     setInterval(() => {
       saveMessages().catch((err) => logger.error({ err }, "Auto-save fallido"));
     }, SAVE_INTERVAL_MS);
+
+    const synced = await syncScriptsFromChannel(client, SCRIPTS_UPLOAD_CHANNEL_ID);
+    logger.info({ synced }, "Sync inicial de scripts desde Discord completada");
+
+    setInterval(async () => {
+      await syncScriptsFromChannel(client, SCRIPTS_UPLOAD_CHANNEL_ID);
+    }, SYNC_SCRIPTS_INTERVAL_MS);
   });
 
   client.on(Events.MessageCreate, async (message: Message) => {
@@ -91,6 +105,11 @@ export async function startBot(): Promise<void> {
 
     await handleAntiLink(message);
     await handleAntiSpam(message);
+
+    if (isScriptChannel(message.channel.id)) {
+      await handleScriptChannel(message);
+      return;
+    }
 
     const content = message.content;
     if (!content.startsWith(PREFIX)) return;
@@ -125,6 +144,9 @@ export async function startBot(): Promise<void> {
         case "timeout":     { await cmdTimeout(message, args); break; }
         case "ticketpa":    { await cmdTicketpa(message); break; }
         case "antilink":    { await cmdAntiLink(message, args); break; }
+        case "all":         { await cmdAll(message); break; }
+        case "scriptgen":
+        case "sg":          { await cmdScriptGen(message, args); break; }
         case "conversacion":
         case "con":         { await cmdConversacion(message, args); break; }
 
@@ -160,6 +182,33 @@ export async function startBot(): Promise<void> {
     } catch (err) {
       logger.error({ err, command }, "Error ejecutando comando");
       try { await message.reply("❌ Ocurrió un error al ejecutar el comando."); } catch {}
+    }
+  });
+
+  client.on(Events.MessageCreate, async (message: Message) => {
+    if (message.author.bot) return;
+    if (!message.guild) return;
+    if (message.channel.id !== SCRIPTS_UPLOAD_CHANNEL_ID) return;
+    if (message.attachments.size === 0) return;
+
+    const allowed = new Set([".lua", ".txt", ".text"]);
+    for (const [, attachment] of message.attachments) {
+      const ext = (attachment.name ?? "").slice((attachment.name ?? "").lastIndexOf(".")).toLowerCase();
+      if (!allowed.has(ext)) continue;
+
+      try {
+        const { default: axios } = await import("axios");
+        const res = await axios.get<string>(attachment.url, {
+          responseType: "text",
+          timeout: 30000,
+          maxContentLength: 100 * 1024 * 1024,
+        });
+        const { saveScript } = await import("./scriptStore");
+        await saveScript(attachment.name!, res.data);
+        logger.info({ name: attachment.name }, "Script auto-guardado desde canal de uploads");
+      } catch (err) {
+        logger.warn({ err, name: attachment.name }, "Error auto-guardando script");
+      }
     }
   });
 
