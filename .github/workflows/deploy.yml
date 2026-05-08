@@ -18,8 +18,8 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          SERVICE_ID="081e83c9-2042-40c4-9041-ac99dda1ebeb"
-          ENV_ID="93108fbe-edfa-4097-bc98-dfdb8da790de"
+          SERVICE_ID="b6b54fdb-16cd-4b5c-8bb8-138c2b884334"
+          ENV_ID="1dd6de68-2d71-4eed-852a-c4729afb3922"
 
           echo "Triggering Railway deployment..."
           RESPONSE=$(curl -s -X POST "https://backboard.railway.app/graphql/v2" \
