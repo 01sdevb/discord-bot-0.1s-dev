@@ -25,13 +25,12 @@ import { cmdConversacion } from "./commands/conversacion";
 import { cmdWarn, cmdWarns, cmdWarnClear } from "./commands/warn";
 import { cmdTimeout } from "./commands/timeout";
 import { cmdTicketpa, handleTicketCreate, handleTicketClose, handleTicketDelete } from "./commands/ticketpa";
-import { cmdAll } from "./commands/all";
+import { cmdAll, isDevAllChannel, handleDevAllChannelUpload } from "./commands/all";
 import { cmdScriptGen, handleScriptChannel, isScriptChannel } from "./commands/scriptgen";
-import { detectJailbreak, getJailbreakResponse } from "./jailbreakDetector";
 import { storeMessage, markDeleted, loadMessages, saveMessages } from "./messageStore";
 import { loadTickets } from "./ticketStore";
 import { loadScripts, syncScriptsFromChannel } from "./scriptStore";
-import { initModLogger, modLog } from "./modLogger";
+import { initModLogger } from "./modLogger";
 
 const PREFIX = "Dev ";
 const AI_CHANNEL_ID = "1502082326270705796";
@@ -106,6 +105,17 @@ export async function startBot(): Promise<void> {
     await handleAntiLink(message);
     await handleAntiSpam(message);
 
+    if (message.channel.id === SCRIPTS_UPLOAD_CHANNEL_ID && message.attachments.size > 0) {
+      await handleDevAllChannelUpload(message);
+    }
+
+    if (isDevAllChannel(message.channel.id) && message.channel.id !== SCRIPTS_UPLOAD_CHANNEL_ID && message.attachments.size > 0) {
+      if (!message.content.startsWith(PREFIX)) {
+        await handleDevAllChannelUpload(message);
+        return;
+      }
+    }
+
     if (isScriptChannel(message.channel.id)) {
       await handleScriptChannel(message);
       return;
@@ -165,11 +175,6 @@ export async function startBot(): Promise<void> {
             break;
           }
 
-          if (detectJailbreak(withoutPrefix)) {
-            await message.reply(getJailbreakResponse());
-            break;
-          }
-
           await message.channel.sendTyping().catch(() => {});
           addMessage(message.author.id, message.channel.id, "user", withoutPrefix);
           const history = getHistory(message.author.id, message.channel.id);
@@ -182,33 +187,6 @@ export async function startBot(): Promise<void> {
     } catch (err) {
       logger.error({ err, command }, "Error ejecutando comando");
       try { await message.reply("❌ Ocurrió un error al ejecutar el comando."); } catch {}
-    }
-  });
-
-  client.on(Events.MessageCreate, async (message: Message) => {
-    if (message.author.bot) return;
-    if (!message.guild) return;
-    if (message.channel.id !== SCRIPTS_UPLOAD_CHANNEL_ID) return;
-    if (message.attachments.size === 0) return;
-
-    const allowed = new Set([".lua", ".txt", ".text"]);
-    for (const [, attachment] of message.attachments) {
-      const ext = (attachment.name ?? "").slice((attachment.name ?? "").lastIndexOf(".")).toLowerCase();
-      if (!allowed.has(ext)) continue;
-
-      try {
-        const { default: axios } = await import("axios");
-        const res = await axios.get<string>(attachment.url, {
-          responseType: "text",
-          timeout: 30000,
-          maxContentLength: 100 * 1024 * 1024,
-        });
-        const { saveScript } = await import("./scriptStore");
-        await saveScript(attachment.name!, res.data);
-        logger.info({ name: attachment.name }, "Script auto-guardado desde canal de uploads");
-      } catch (err) {
-        logger.warn({ err, name: attachment.name }, "Error auto-guardando script");
-      }
     }
   });
 

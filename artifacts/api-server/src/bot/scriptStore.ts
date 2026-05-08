@@ -60,8 +60,20 @@ export function getScriptCount(): number {
 export function buildScriptContext(): string {
   const scripts = [...cache.values()];
   if (scripts.length === 0) return "-- No hay scripts de referencia guardados aún.";
-  return scripts
-    .map((s) => `-- === ARCHIVO: ${s.name} ===\n${s.content}`)
+
+  const shuffled = scripts.sort(() => Math.random() - 0.5);
+  const MAX_SCRIPTS = 8;
+  const MAX_CHARS_PER_SCRIPT = 6000;
+
+  const selected = shuffled.slice(0, MAX_SCRIPTS);
+
+  return selected
+    .map((s) => {
+      const trimmed = s.content.length > MAX_CHARS_PER_SCRIPT
+        ? s.content.slice(0, MAX_CHARS_PER_SCRIPT) + "\n-- [... continúa]"
+        : s.content;
+      return `-- === ARCHIVO: ${s.name} ===\n${trimmed}`;
+    })
     .join("\n\n");
 }
 
