@@ -227,6 +227,36 @@ export async function cmdReplay(message: Message): Promise<void> {
   await message.reply(`🔁 Repitiendo: **${queue.entries[queue.current]!.title}**`);
 }
 
+export async function cmdSkip(message: Message): Promise<void> {
+  if (!message.guild) return;
+
+  const guildId = message.guild.id;
+  const queue = queues.get(guildId);
+  const player = players.get(guildId);
+
+  if (!queue || queue.entries.length === 0) {
+    await message.reply("❌ No hay nada en cola para saltar.");
+    return;
+  }
+
+  if (queue.current >= queue.entries.length - 1) {
+    player?.stop();
+    queues.delete(guildId);
+    players.delete(guildId);
+    const conn = getVoiceConnection(guildId);
+    conn?.destroy();
+    await message.reply("⏭️ Era la última canción. Música detenida.");
+    return;
+  }
+
+  const skipped = queue.entries[queue.current]!;
+  queue.current++;
+  players.delete(guildId);
+
+  await playNext(guildId, message.client);
+  await message.reply(`⏭️ Saltada: **${skipped.title}** → ▶️ **${queue.entries[queue.current]!.title}**`);
+}
+
 export async function cmdList(message: Message): Promise<void> {
   if (!message.guild) return;
 
