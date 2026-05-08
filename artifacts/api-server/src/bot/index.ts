@@ -29,6 +29,8 @@ import { cmdUserBanner } from "./commands/userbanner";
 import { cmdLock, cmdUnlock } from "./commands/lock";
 import { cmdServerEmoji } from "./commands/serveremoji";
 import { cmdServerSticker } from "./commands/serversticker";
+import { cmdPurge } from "./commands/purge";
+import { cmdImg } from "./commands/img";
 import { storeMessage, markDeleted, loadMessages, saveMessages } from "./messageStore";
 import { loadTickets } from "./ticketStore";
 import { loadScripts, syncScriptsFromChannel } from "./scriptStore";
@@ -166,6 +168,8 @@ export async function startBot(): Promise<void> {
         case "unlock":      { await cmdUnlock(message); break; }
         case "emoji":       { await cmdServerEmoji(message, args); break; }
         case "sticker":     { await cmdServerSticker(message, args); break; }
+        case "purge":       { await cmdPurge(message, args); break; }
+        case "img":         { await cmdImg(message, args); break; }
 
         case "antispam": {
           await message.reply(

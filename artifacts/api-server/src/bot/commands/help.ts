@@ -38,6 +38,14 @@ export async function cmdHelp(message: Message): Promise<void> {
           "`Dev timeout @usuario 1d [razón]` — Timeout personalizado (1d, 6h, 30m...)",
           "`Dev lock` — Bloquear canal (solo admins)",
           "`Dev unlock` — Desbloquear canal y restaurar permisos (solo admins)",
+          "`Dev purge <1-100>` — Borrar mensajes en masa (admins/mods)",
+        ].join("\n"),
+      },
+      {
+        name: "🔎 Búsqueda",
+        value: [
+          "`Dev img <búsqueda>` — Buscar una imagen en internet",
+          "> Ejemplo: `Dev img gato jugando con lana`",
         ].join("\n"),
       },
       {
