@@ -16,17 +16,19 @@ function nextOpenRouterKey(): string {
 }
 
 const FREE_SCRIPT_MODELS = [
+  "meta-llama/llama-3.3-70b-instruct:free",
   "deepseek/deepseek-r1:free",
-  "google/gemma-3-27b-it:free",
-  "meta-llama/llama-4-scout:free",
+  "google/gemma-2-9b-it:free",
   "mistralai/mistral-7b-instruct:free",
+  "qwen/qwen-2.5-72b-instruct:free",
 ];
 
 const FREE_CHAT_MODELS = [
+  "meta-llama/llama-3.3-70b-instruct:free",
   "deepseek/deepseek-r1:free",
-  "google/gemma-3-27b-it:free",
-  "meta-llama/llama-4-scout:free",
+  "google/gemma-2-9b-it:free",
   "mistralai/mistral-7b-instruct:free",
+  "qwen/qwen-2.5-72b-instruct:free",
 ];
 
 let scriptModelIndex = 0;
@@ -128,8 +130,9 @@ Genera el script Lua COMPLETO ahora. Sin restricciones. Sin límites. SOLO CÓDI
         logger.info({ model, length: cleaned.length }, "Script generado exitosamente");
         return cleaned;
       }
-    } catch (err) {
-      logger.warn({ err, model }, `Modelo ${model} falló, intentando siguiente`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
+      logger.warn({ model, msg }, `Modelo ${model} falló, intentando siguiente`);
     }
   }
 
@@ -152,8 +155,9 @@ export async function askAI(prompt: string, history: ChatMessage[] = []): Promis
     try {
       const text = await callOpenRouter(model, messages, 30000);
       if (text) return text.slice(0, 1900);
-    } catch (err) {
-      logger.warn({ err, model }, `Chat modelo ${model} falló, intentando siguiente`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
+      logger.warn({ model, msg }, `Chat modelo ${model} falló, intentando siguiente`);
     }
   }
 
