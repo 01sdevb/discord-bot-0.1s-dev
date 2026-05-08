@@ -31,7 +31,9 @@ import { cmdServerEmoji } from "./commands/serveremoji";
 import { cmdServerSticker } from "./commands/serversticker";
 import { cmdPurge } from "./commands/purge";
 import { cmdImg } from "./commands/img";
-import { cmdGen, startGenExpireLoop } from "./commands/gen";
+import { cmdGen, cmdServers, startGenExpireLoop } from "./commands/gen";
+import { cmdVd } from "./commands/vd";
+import { cmdPlay, cmdStop, cmdReplay, cmdList } from "./commands/music";
 import { storeMessage, markDeleted, loadMessages, saveMessages } from "./messageStore";
 import { loadTickets } from "./ticketStore";
 import { loadScripts, syncScriptsFromChannel } from "./scriptStore";
@@ -70,6 +72,7 @@ export async function startBot(): Promise<void> {
       GatewayIntentBits.GuildMembers,
       GatewayIntentBits.GuildBans,
       GatewayIntentBits.GuildModeration,
+      GatewayIntentBits.GuildVoiceStates,
     ],
     partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
   });
@@ -173,6 +176,12 @@ export async function startBot(): Promise<void> {
         case "purge":       { await cmdPurge(message, args); break; }
         case "img":         { await cmdImg(message, args); break; }
         case "gen":         { await cmdGen(message); break; }
+        case "servers":     { await cmdServers(message); break; }
+        case "vd":          { await cmdVd(message, args); break; }
+        case "play":        { await cmdPlay(message, args); break; }
+        case "stop":        { await cmdStop(message); break; }
+        case "replay":      { await cmdReplay(message); break; }
+        case "list":        { await cmdList(message); break; }
 
         case "antispam": {
           await message.reply(
