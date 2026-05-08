@@ -86,9 +86,24 @@ export async function cmdHelp(message: Message): Promise<void> {
       {
         name: "🎮 Dev Gen — Steal and Brainrot",
         value: [
-          "`Dev gen` — Genera un servidor privado del juego (solo en el canal asignado)",
-          "> 1 generación por usuario cada **5 días**.",
-          "> El mensaje con el link se elimina automáticamente al expirar.",
+          "`Dev gen` — Genera un servidor privado (requiere rol, solo en canal asignado)",
+          "> 1 generación cada **5 días** por usuario. El link llega a tu DM.",
+          "`Dev servers` — Lista los servidores privados activos actualmente.",
+        ].join("\n"),
+      },
+      {
+        name: "🎬 Videos",
+        value: [
+          "`Dev vd <nombre>` — Busca un video/película/serie en YouTube y lo envía al canal de videos.",
+        ].join("\n"),
+      },
+      {
+        name: "🎵 Música",
+        value: [
+          "`Dev play <canción>` — Busca y reproduce en tu canal de voz",
+          "`Dev stop` — Detiene la música y desconecta el bot",
+          "`Dev replay` — Repite la canción actual",
+          "`Dev list` — Muestra la cola de canciones",
         ].join("\n"),
       },
       {
