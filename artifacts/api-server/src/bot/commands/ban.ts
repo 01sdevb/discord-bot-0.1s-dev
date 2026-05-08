@@ -1,10 +1,8 @@
 import { Message, PermissionFlagsBits, EmbedBuilder } from "discord.js";
+import { modLog } from "../modLogger";
 
 export async function cmdBan(message: Message, args: string[]): Promise<void> {
-  if (!message.guild) {
-    await message.reply("Este comando solo funciona en un servidor.");
-    return;
-  }
+  if (!message.guild) return;
 
   const executor = message.member;
   if (!executor) return;
@@ -26,7 +24,7 @@ export async function cmdBan(message: Message, args: string[]): Promise<void> {
   }
 
   if (!target.bannable) {
-    await message.reply("❌ No puedo banear a este usuario. Puede que tenga un rol superior al mío o al tuyo.");
+    await message.reply("❌ No puedo banear a este usuario. Puede que tenga un rol superior al mío.");
     return;
   }
 
@@ -53,7 +51,15 @@ export async function cmdBan(message: Message, args: string[]): Promise<void> {
       .setTimestamp();
 
     await message.reply({ embeds: [embed] });
-  } catch (err) {
+
+    await modLog({
+      type: "ban",
+      guildId: message.guild.id,
+      target: { id: target.id, tag: target.user.tag, avatarUrl: target.user.displayAvatarURL() },
+      moderator: { id: message.author.id, tag: message.author.tag },
+      reason,
+    });
+  } catch {
     await message.reply("❌ No se pudo banear al usuario. Verifica mis permisos.");
   }
 }

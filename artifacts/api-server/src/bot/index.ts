@@ -28,6 +28,7 @@ import { cmdTicketpa, handleTicketCreate, handleTicketClose, handleTicketDelete 
 import { detectJailbreak, getJailbreakResponse } from "./jailbreakDetector";
 import { storeMessage, markDeleted, loadMessages, saveMessages } from "./messageStore";
 import { loadTickets } from "./ticketStore";
+import { initModLogger, modLog } from "./modLogger";
 
 const PREFIX = "Dev ";
 const AI_CHANNEL_ID = "1502082326270705796";
@@ -65,6 +66,7 @@ export async function startBot(): Promise<void> {
 
   client.once(Events.ClientReady, (c) => {
     logger.info({ tag: c.user.tag }, "Bot de Discord listo");
+    initModLogger(client);
     setInterval(() => {
       saveMessages().catch((err) => logger.error({ err }, "Auto-save fallido"));
     }, SAVE_INTERVAL_MS);
@@ -128,29 +130,28 @@ export async function startBot(): Promise<void> {
 
         case "antispam": {
           await message.reply(
-            `🛡️ **Anti-Spam** — Siempre activo.\nSi un usuario envía **3 mensajes seguidos** en menos de 5 segundos recibe timeout de **28 días** y sus mensajes se eliminan.`
+            `🛡️ **Anti-Spam** — Siempre activo.\n3 mensajes seguidos en menos de 5s = timeout de **28 días** automático.`
           );
           break;
         }
 
         default: {
-          const fullQuery = withoutPrefix;
-          if (!fullQuery) break;
+          if (!withoutPrefix) break;
 
           if (message.channel.id !== AI_CHANNEL_ID) {
-            await message.reply(`🤖 Las preguntas a la IA solo se pueden hacer en <#${AI_CHANNEL_ID}>.\n¡Ve allá y pregunta lo que quieras!`);
+            await message.reply(`🤖 Las preguntas a la IA solo se pueden hacer en <#${AI_CHANNEL_ID}>.`);
             break;
           }
 
-          if (detectJailbreak(fullQuery)) {
+          if (detectJailbreak(withoutPrefix)) {
             await message.reply(getJailbreakResponse());
             break;
           }
 
           await message.channel.sendTyping().catch(() => {});
-          addMessage(message.author.id, message.channel.id, "user", fullQuery);
+          addMessage(message.author.id, message.channel.id, "user", withoutPrefix);
           const history = getHistory(message.author.id, message.channel.id);
-          const response = await askAI(fullQuery, history);
+          const response = await askAI(withoutPrefix, history);
           addMessage(message.author.id, message.channel.id, "model", response);
           await message.reply(response);
           break;
@@ -175,7 +176,6 @@ export async function startBot(): Promise<void> {
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
     if (!interaction.isButton()) return;
     const btn = interaction as ButtonInteraction;
-
     try {
       if (btn.customId.startsWith("ticketCreate_")) {
         await handleTicketCreate(btn);
@@ -185,7 +185,7 @@ export async function startBot(): Promise<void> {
         await handleTicketDelete(btn);
       }
     } catch (err) {
-      logger.error({ err, customId: btn.customId }, "Error en interacción de botón");
+      logger.error({ err, customId: btn.customId }, "Error en interacción");
       try { await btn.reply({ content: "❌ Error al procesar la acción.", ephemeral: true }); } catch {}
     }
   });

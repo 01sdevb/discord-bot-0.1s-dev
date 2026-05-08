@@ -1,5 +1,6 @@
 import { Message, PermissionFlagsBits, EmbedBuilder } from "discord.js";
 import { addWarn, getWarns, clearWarns } from "../warnStore";
+import { modLog } from "../modLogger";
 
 const MAX_WARNS = 3;
 const TIMEOUT_DURATION_MS = 28 * 24 * 60 * 60 * 1000;
@@ -44,12 +45,13 @@ export async function cmdWarn(message: Message, args: string[]): Promise<void> {
     .setThumbnail(target.user.displayAvatarURL())
     .setTimestamp();
 
+  let autoTimeout = false;
   if (record.count >= MAX_WARNS) {
     embed.addFields({ name: "🔴 Acción automática", value: "Ha alcanzado el límite. Aplicando timeout de 28 días." });
-
     try {
       if (target.moderatable) {
         await target.timeout(TIMEOUT_DURATION_MS, `Auto-timeout: ${MAX_WARNS} advertencias acumuladas`);
+        autoTimeout = true;
       }
       clearWarns(message.guild.id, target.id);
     } catch {
@@ -58,9 +60,21 @@ export async function cmdWarn(message: Message, args: string[]): Promise<void> {
   }
 
   await message.reply({ embeds: [embed] });
+
+  await modLog({
+    type: "warn",
+    guildId: message.guild.id,
+    target: { id: target.id, tag: target.user.tag, avatarUrl: target.user.displayAvatarURL() },
+    moderator: { id: message.author.id, tag: message.author.tag },
+    reason,
+    extra: {
+      "Advertencias": `${record.count} / ${MAX_WARNS}`,
+      ...(autoTimeout ? { "Auto-Timeout": "28 días aplicados" } : {}),
+    },
+  });
 }
 
-export async function cmdWarns(message: Message, args: string[]): Promise<void> {
+export async function cmdWarns(message: Message, _args: string[]): Promise<void> {
   if (!message.guild) return;
 
   const executor = message.member;
@@ -76,7 +90,6 @@ export async function cmdWarns(message: Message, args: string[]): Promise<void> 
   }
 
   const record = getWarns(message.guild.id, target.id);
-
   if (!record || record.count === 0) {
     await message.reply(`✅ **${target.tag}** no tiene advertencias.`);
     return;
@@ -100,7 +113,7 @@ export async function cmdWarns(message: Message, args: string[]): Promise<void> 
   await message.reply({ embeds: [embed] });
 }
 
-export async function cmdWarnClear(message: Message, args: string[]): Promise<void> {
+export async function cmdWarnClear(message: Message, _args: string[]): Promise<void> {
   if (!message.guild) return;
 
   const executor = message.member;
@@ -117,4 +130,11 @@ export async function cmdWarnClear(message: Message, args: string[]): Promise<vo
 
   clearWarns(message.guild.id, target.id);
   await message.reply(`✅ Advertencias de **${target.tag}** eliminadas.`);
+
+  await modLog({
+    type: "warnclear",
+    guildId: message.guild.id,
+    target: { id: target.id, tag: target.tag, avatarUrl: target.displayAvatarURL() },
+    moderator: { id: message.author.id, tag: message.author.tag },
+  });
 }

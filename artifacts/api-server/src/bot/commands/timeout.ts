@@ -1,4 +1,5 @@
 import { Message, PermissionFlagsBits, EmbedBuilder } from "discord.js";
+import { modLog } from "../modLogger";
 
 const MAX_MS = 28 * 24 * 60 * 60 * 1000;
 
@@ -40,7 +41,7 @@ export async function cmdTimeout(message: Message, args: string[]): Promise<void
   if (!target) {
     await message.reply(
       "❌ Uso: `Dev timeout @usuario <duración> [razón]`\n" +
-      "Ejemplos: `Dev timeout @usuario 1d`, `Dev timeout @usuario 2h Spam`, `Dev timeout @usuario 28d`",
+      "Ejemplos: `Dev timeout @usuario 1d`, `Dev timeout @usuario 6h Spam`, `Dev timeout @usuario 28d`",
     );
     return;
   }
@@ -71,12 +72,10 @@ export async function cmdTimeout(message: Message, args: string[]): Promise<void
     await message.reply("❌ Duración inválida. Usa formato: `1d`, `6h`, `30m`, `60s`");
     return;
   }
-
-  if (durationMs > MAX_MS) {
-    durationMs = MAX_MS;
-  }
+  if (durationMs > MAX_MS) durationMs = MAX_MS;
 
   const reason = args.slice(2).join(" ") || "Sin razón especificada";
+  const formatted = formatDuration(durationMs);
 
   try {
     await target.timeout(durationMs, reason);
@@ -86,7 +85,7 @@ export async function cmdTimeout(message: Message, args: string[]): Promise<void
       .addFields(
         { name: "Usuario", value: `${target.user.tag}`, inline: true },
         { name: "Moderador", value: `${message.author.tag}`, inline: true },
-        { name: "Duración", value: formatDuration(durationMs), inline: true },
+        { name: "Duración", value: formatted, inline: true },
         { name: "Razón", value: reason },
       )
       .setColor(0xff8800)
@@ -94,6 +93,15 @@ export async function cmdTimeout(message: Message, args: string[]): Promise<void
       .setTimestamp();
 
     await message.reply({ embeds: [embed] });
+
+    await modLog({
+      type: "timeout",
+      guildId: message.guild.id,
+      target: { id: target.id, tag: target.user.tag, avatarUrl: target.user.displayAvatarURL() },
+      moderator: { id: message.author.id, tag: message.author.tag },
+      reason,
+      extra: { "Duración": formatted },
+    });
   } catch {
     await message.reply("❌ No se pudo aplicar el timeout. Verifica mis permisos.");
   }
