@@ -1,5 +1,5 @@
 import { Message, AttachmentBuilder } from "discord.js";
-import { buildScriptContext, getScriptCount } from "../scriptStore";
+import { findRelevantScripts, getScriptCount } from "../scriptStore";
 import { askScriptAI } from "../aiClient";
 
 const SCRIPT_CHANNEL_ID = "1502064878377111773";
@@ -24,7 +24,7 @@ export async function cmdScriptGen(message: Message, args: string[]): Promise<vo
 
   await message.channel.sendTyping().catch(() => {});
 
-  const context = buildScriptContext();
+  const context = findRelevantScripts(request);
   const scriptCode = await askScriptAI(request, context);
 
   const finalScript = scriptCode.startsWith(HEADER)
@@ -54,7 +54,7 @@ export async function handleScriptChannel(message: Message): Promise<void> {
 
   await message.channel.sendTyping().catch(() => {});
 
-  const context = buildScriptContext();
+  const context = findRelevantScripts(request);
   const scriptCode = await askScriptAI(request, context);
 
   const finalScript = scriptCode.startsWith(HEADER)

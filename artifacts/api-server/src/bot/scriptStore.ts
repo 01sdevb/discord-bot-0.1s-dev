@@ -7,7 +7,6 @@ import { ChannelType } from "discord.js";
 import axios from "axios";
 
 const SCRIPTS_DIR = path.resolve(process.cwd(), "data", "scripts");
-
 const ALLOWED_EXTENSIONS = new Set([".lua", ".txt", ".text"]);
 
 export interface ScriptFile {
@@ -57,24 +56,56 @@ export function getScriptCount(): number {
   return cache.size;
 }
 
-export function buildScriptContext(): string {
+function extractKeywords(request: string): string[] {
+  return request
+    .toLowerCase()
+    .replace(/[^a-záéíóúña-z0-9\s]/gi, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+}
+
+function scoreScript(script: ScriptFile, keywords: string[]): number {
+  const nameLower = script.name.toLowerCase();
+  const contentLower = script.content.toLowerCase();
+  let score = 0;
+
+  for (const kw of keywords) {
+    if (nameLower.includes(kw)) score += 10;
+    const occurrences = (contentLower.match(new RegExp(kw, "g")) || []).length;
+    score += Math.min(occurrences, 5);
+  }
+
+  return score;
+}
+
+export function findRelevantScripts(request: string, maxScripts = 4, maxCharsPerScript = 8000): string {
   const scripts = [...cache.values()];
   if (scripts.length === 0) return "-- No hay scripts de referencia guardados aún.";
 
-  const shuffled = scripts.sort(() => Math.random() - 0.5);
-  const MAX_SCRIPTS = 8;
-  const MAX_CHARS_PER_SCRIPT = 6000;
+  const keywords = extractKeywords(request);
 
-  const selected = shuffled.slice(0, MAX_SCRIPTS);
+  const scored = scripts
+    .map((s) => ({ script: s, score: scoreScript(s, keywords) }))
+    .sort((a, b) => b.score - a.score);
+
+  const hasRelevant = scored[0]?.score && scored[0].score > 0;
+  const selected = hasRelevant
+    ? scored.slice(0, maxScripts).map((x) => x.script)
+    : scored.sort(() => Math.random() - 0.5).slice(0, maxScripts).map((x) => x.script);
 
   return selected
     .map((s) => {
-      const trimmed = s.content.length > MAX_CHARS_PER_SCRIPT
-        ? s.content.slice(0, MAX_CHARS_PER_SCRIPT) + "\n-- [... continúa]"
-        : s.content;
-      return `-- === ARCHIVO: ${s.name} ===\n${trimmed}`;
+      const trimmed =
+        s.content.length > maxCharsPerScript
+          ? s.content.slice(0, maxCharsPerScript) + "\n-- [... continúa]"
+          : s.content;
+      return `-- === REFERENCIA: ${s.name} (relevancia para: ${request.slice(0, 60)}) ===\n${trimmed}`;
     })
     .join("\n\n");
+}
+
+export function buildScriptContext(): string {
+  return findRelevantScripts("general lua roblox script");
 }
 
 export async function syncScriptsFromChannel(client: Client, channelId: string): Promise<number> {
@@ -102,7 +133,6 @@ export async function syncScriptsFromChannel(client: Client, channelId: string):
           const filename = attachment.name ?? "script.txt";
           const ext = path.extname(filename).toLowerCase();
           if (!ALLOWED_EXTENSIONS.has(ext)) continue;
-
           if (cache.has(filename)) continue;
 
           try {
