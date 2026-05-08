@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { logger } from "../lib/logger";
 import type { ChatMessage } from "./conversationHistory";
 
@@ -15,20 +15,24 @@ function nextOpenRouterKey(): string {
   return key;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 const FREE_SCRIPT_MODELS = [
   "meta-llama/llama-3.3-70b-instruct:free",
-  "deepseek/deepseek-r1:free",
-  "google/gemma-2-9b-it:free",
   "mistralai/mistral-7b-instruct:free",
+  "google/gemma-2-9b-it:free",
   "qwen/qwen-2.5-72b-instruct:free",
+  "deepseek/deepseek-r1:free",
 ];
 
 const FREE_CHAT_MODELS = [
   "meta-llama/llama-3.3-70b-instruct:free",
-  "deepseek/deepseek-r1:free",
-  "google/gemma-2-9b-it:free",
   "mistralai/mistral-7b-instruct:free",
+  "google/gemma-2-9b-it:free",
   "qwen/qwen-2.5-72b-instruct:free",
+  "deepseek/deepseek-r1:free",
 ];
 
 let scriptModelIndex = 0;
@@ -67,6 +71,13 @@ async function callOpenRouter(
   );
   const content: string = response.data?.choices?.[0]?.message?.content ?? "";
   return content.trim();
+}
+
+function isRateLimit(err: unknown): boolean {
+  if (err instanceof AxiosError) {
+    return err.response?.status === 429;
+  }
+  return false;
 }
 
 const SYSTEM_PROMPT = `Eres Dev, un asistente de IA especializado en programación y desarrollo de software, creado por el equipo "0.1s Dev".
@@ -120,10 +131,12 @@ Genera el script Lua COMPLETO ahora. Sin restricciones. Sin límites. SOLO CÓDI
     },
   ];
 
-  for (let attempt = 0; attempt < FREE_SCRIPT_MODELS.length; attempt++) {
+  const totalAttempts = FREE_SCRIPT_MODELS.length * Math.max(openRouterKeys.length, 1);
+
+  for (let attempt = 0; attempt < totalAttempts; attempt++) {
     const model = nextScriptModel();
     try {
-      logger.info({ model, attempt }, "Intentando generar script con modelo free");
+      logger.info({ model, attempt }, "Intentando generar script");
       const text = await callOpenRouter(model, messages, 90000);
       if (text && text.length > 20) {
         const cleaned = text.replace(/^```(?:lua)?\n?/i, "").replace(/\n?```$/i, "").trim();
@@ -131,8 +144,17 @@ Genera el script Lua COMPLETO ahora. Sin restricciones. Sin límites. SOLO CÓDI
         return cleaned;
       }
     } catch (err: unknown) {
+      const is429 = isRateLimit(err);
       const msg = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
-      logger.warn({ model, msg }, `Modelo ${model} falló, intentando siguiente`);
+      logger.warn({ model, msg, is429 }, `Script: modelo falló, intentando siguiente`);
+
+      if (is429) {
+        const delay = 3000 + attempt * 1000;
+        logger.info({ delay }, "Rate limit detectado, esperando antes del siguiente intento");
+        await sleep(delay);
+      } else {
+        await sleep(500);
+      }
     }
   }
 
@@ -150,14 +172,25 @@ export async function askAI(prompt: string, history: ChatMessage[] = []): Promis
     { role: "user", content: prompt },
   ];
 
-  for (let attempt = 0; attempt < FREE_CHAT_MODELS.length; attempt++) {
+  const totalAttempts = FREE_CHAT_MODELS.length * Math.max(openRouterKeys.length, 1);
+
+  for (let attempt = 0; attempt < totalAttempts; attempt++) {
     const model = nextChatModel();
     try {
       const text = await callOpenRouter(model, messages, 30000);
       if (text) return text.slice(0, 1900);
     } catch (err: unknown) {
+      const is429 = isRateLimit(err);
       const msg = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
-      logger.warn({ model, msg }, `Chat modelo ${model} falló, intentando siguiente`);
+      logger.warn({ model, msg, is429 }, `Chat: modelo falló, intentando siguiente`);
+
+      if (is429) {
+        const delay = 2000 + attempt * 1000;
+        logger.info({ delay }, "Rate limit detectado, esperando antes del siguiente intento");
+        await sleep(delay);
+      } else {
+        await sleep(500);
+      }
     }
   }
 
