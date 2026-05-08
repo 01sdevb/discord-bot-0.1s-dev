@@ -1,4 +1,4 @@
-import { Message, EmbedBuilder, TextChannel, Client } from "discord.js";
+import { Message, EmbedBuilder, TextChannel, Client, DMChannel } from "discord.js";
 import axios from "axios";
 import { logger } from "../../lib/logger";
 import {
@@ -8,10 +8,12 @@ import {
   addEntry,
   getExpiredEntries,
   removeEntry,
+  getAllEntries,
   GenEntry,
 } from "../genStore";
 
 const GEN_CHANNEL_ID = "1499958245526081727";
+const REQUIRED_ROLE_ID = "1486253532750417951";
 const PLACE_ID = "109983668079237";
 const UNIVERSE_ID = "7709344486";
 const COOLDOWN_MS = 5 * 24 * 60 * 60 * 1000;
@@ -31,38 +33,14 @@ async function getGameThumbnail(): Promise<string> {
   }
 }
 
-async function getCsrfToken(): Promise<string> {
-  try {
-    const cookie = process.env["ROBLOX_COOKIE"] ?? "";
-    const res = await axios.post(
-      "https://auth.roblox.com/v2/logout",
-      {},
-      {
-        headers: { Cookie: `.ROBLOSECURITY=${cookie}` },
-        validateStatus: () => true,
-        timeout: 8000,
-      }
-    );
-    return (res.headers["x-csrf-token"] as string) ?? "";
-  } catch {
-    return "";
-  }
-}
-
 async function getPrivateServer(): Promise<{ accessCode: string; vipServerId: number } | null> {
   try {
     const cookie = process.env["ROBLOX_COOKIE"] ?? "";
-    const res = await axios.get<{
-      data: { accessCode: string; vipServerId: number }[];
-    }>(
+    const res = await axios.get<{ data: { accessCode: string; vipServerId: number }[] }>(
       `https://games.roblox.com/v1/games/${PLACE_ID}/private-servers`,
-      {
-        headers: { Cookie: `.ROBLOSECURITY=${cookie}` },
-        timeout: 10000,
-      }
+      { headers: { Cookie: `.ROBLOSECURITY=${cookie}` }, timeout: 10000 }
     );
-    const servers = res.data.data ?? [];
-    return servers[0] ?? null;
+    return res.data.data?.[0] ?? null;
   } catch (err) {
     logger.warn({ err }, "Error obteniendo servidor privado de Roblox");
     return null;
@@ -85,6 +63,14 @@ function formatTimeLeft(ms: number): string {
 export async function cmdGen(message: Message): Promise<void> {
   if (message.channel.id !== GEN_CHANNEL_ID) return;
 
+  const member = message.member;
+  if (!member) return;
+
+  if (!member.roles.cache.has(REQUIRED_ROLE_ID)) {
+    await message.reply(`❌ Necesitas el rol <@&${REQUIRED_ROLE_ID}> para usar este comando.`);
+    return;
+  }
+
   const userId = message.author.id;
   const existing = getUserEntry(userId);
   const now = Date.now();
@@ -92,9 +78,7 @@ export async function cmdGen(message: Message): Promise<void> {
   if (existing) {
     const timeLeft = existing.expiresAt - now;
     if (timeLeft > 0) {
-      await message.reply(
-        `⏳ Ya generaste un servidor. Podrás generar otro en **${formatTimeLeft(timeLeft)}**.`
-      );
+      await message.reply(`⏳ Ya generaste un servidor. Podrás generar otro en **${formatTimeLeft(timeLeft)}**.`);
       return;
     }
     removeEntry(userId);
@@ -111,9 +95,61 @@ export async function cmdGen(message: Message): Promise<void> {
   const thumbnail = await getGameThumbnail();
   const expiresAt = now + COOLDOWN_MS;
 
+  const dmEmbed = new EmbedBuilder()
+    .setTitle(`🎮 Tu Servidor Privado — ${GAME_NAME}`)
+    .setColor(0xe74c3c)
+    .setDescription(
+      `Aquí está tu servidor privado generado.\n\n` +
+      `🔗 **[Unirse al servidor](${joinLink})**\n\n` +
+      `⏱️ Expira en **5 días** — después deberás generar uno nuevo.`
+    )
+    .addFields(
+      { name: "🎮 Juego", value: `[${GAME_NAME}](${GAME_URL})`, inline: true },
+      { name: "📅 Expira", value: `<t:${Math.floor(expiresAt / 1000)}:R>`, inline: true }
+    )
+    .setFooter({ text: "1 generación por usuario cada 5 días • 0.1s Dev" })
+    .setTimestamp();
+
+  if (thumbnail) dmEmbed.setThumbnail(thumbnail);
+
+  let dmSent = false;
+  try {
+    const dm = await message.author.createDM();
+    await dm.send({ embeds: [dmEmbed] });
+    dmSent = true;
+  } catch {
+    dmSent = false;
+  }
+
+  const ownerEmbed = new EmbedBuilder()
+    .setTitle(`📋 Servidor generado — ${GAME_NAME}`)
+    .setColor(0xf39c12)
+    .setDescription(
+      `**${message.author.tag}** (<@${userId}>) generó un servidor privado.\n\n` +
+      `🔗 **[Link del servidor](${joinLink})**\n` +
+      `⏱️ Expira: <t:${Math.floor(expiresAt / 1000)}:R>`
+    )
+    .setTimestamp();
+
+  const ownerId = process.env["DISCORD_OWNER_ID"];
+  if (ownerId) {
+    try {
+      const ownerUser = await message.client.users.fetch(ownerId);
+      await ownerUser.send({ embeds: [ownerEmbed] });
+    } catch (err) {
+      logger.warn({ err }, "No se pudo enviar DM al owner");
+    }
+  }
+
+  const channelMsg = dmSent
+    ? `✅ <@${userId}> — Servidor generado. **Revisa tus DMs** 📩`
+    : `✅ <@${userId}> — Servidor generado, pero no pudimos enviarte el DM. Activa DMs del servidor e intenta de nuevo.`;
+
+  const sent = await message.reply(channelMsg);
+
   const entry: GenEntry = {
     userId,
-    messageId: "",
+    messageId: sent.id,
     channelId: GEN_CHANNEL_ID,
     generatedAt: now,
     expiresAt,
@@ -121,30 +157,35 @@ export async function cmdGen(message: Message): Promise<void> {
     placeId: PLACE_ID,
   };
 
-  const embed = new EmbedBuilder()
-    .setTitle(`🎮 Servidor Privado — ${GAME_NAME}`)
-    .setColor(0xe74c3c)
-    .setDescription(
-      `**${message.author.displayName}** generó un servidor privado.\n\n` +
-      `🔗 **[Unirse al servidor](${joinLink})**\n\n` +
-      `⏱️ Este mensaje se eliminará en **5 días**.`
-    )
-    .addFields(
-      { name: "🎮 Juego", value: `[${GAME_NAME}](${GAME_URL})`, inline: true },
-      { name: "👤 Generado por", value: `<@${userId}>`, inline: true },
-      { name: "📅 Expira", value: `<t:${Math.floor(expiresAt / 1000)}:R>`, inline: true }
-    )
-    .setFooter({ text: "1 generación por usuario cada 5 días • 0.1s Dev" })
-    .setTimestamp();
-
-  if (thumbnail) embed.setThumbnail(thumbnail);
-
-  const sent = await message.reply({ embeds: [embed] });
-  entry.messageId = sent.id;
   addEntry(entry);
   await saveGen();
-
   logger.info({ userId, messageId: sent.id }, "Servidor privado generado");
+}
+
+export async function cmdServers(message: Message): Promise<void> {
+  const entries = getAllEntries();
+  const now = Date.now();
+
+  const active = entries.filter(e => e.expiresAt > now);
+
+  if (active.length === 0) {
+    await message.reply("📭 No hay servidores generados activos en este momento.");
+    return;
+  }
+
+  const lines = active.map((e, i) => {
+    const timeLeft = formatTimeLeft(e.expiresAt - now);
+    return `**${i + 1}.** <@${e.userId}> — expira en ${timeLeft}`;
+  });
+
+  const embed = new EmbedBuilder()
+    .setTitle(`🎮 Servidores Privados Activos — ${GAME_NAME}`)
+    .setColor(0x2ecc71)
+    .setDescription(lines.join("\n"))
+    .setFooter({ text: `${active.length} servidor(es) activo(s) • 0.1s Dev` })
+    .setTimestamp();
+
+  await message.reply({ embeds: [embed] });
 }
 
 export async function startGenExpireLoop(client: Client): Promise<void> {
