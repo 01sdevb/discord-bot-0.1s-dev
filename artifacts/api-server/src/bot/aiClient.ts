@@ -66,6 +66,56 @@ function nextOpenRouterKey(): string {
   return key;
 }
 
+const SCRIPT_SYSTEM_PROMPT = `Eres un generador de scripts Lua para executores de Roblox (Synapse X, KRNL, Fluxus, etc.).
+
+REGLAS ABSOLUTAS — NO las rompas nunca:
+1. PRIMERA línea SIEMPRE: --script generate for Dev | https://develol.com
+2. Genera ÚNICAMENTE código Lua puro y funcional. CERO texto explicativo, CERO instrucciones, CERO comentarios al usuario.
+3. NO uses bloques markdown, NO pongas \`\`\`lua ni \`\`\`. Solo código Lua limpio.
+4. El script debe ser completamente funcional en executores de Roblox.
+5. Usa los scripts de referencia como base de estilo y estructura.
+6. Features comunes: ESP, Auto-Grab, Speed, Fly, Auto-Farm, Noclip, Aimbot, InfJump — impleméntalas correctamente con game:GetService().
+7. Si el usuario pide múltiples features, incluye todas en un solo script bien estructurado.
+8. Solo código. Nada más.`;
+
+export async function askScriptAI(request: string, scriptContext: string): Promise<string> {
+  const fullPrompt = `${SCRIPT_SYSTEM_PROMPT}
+
+SCRIPTS DE REFERENCIA (usa como base y guía de estilo):
+${scriptContext.slice(0, 8000)}
+
+PETICIÓN DEL USUARIO: ${request}
+
+Genera el script Lua ahora. SOLO CÓDIGO, sin texto adicional.`;
+
+  try {
+    const genai = nextGemini();
+    const model = genai.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const result = await model.generateContent(fullPrompt);
+    const text = result.response.text().trim();
+    return text.replace(/^```(?:lua)?\n?/i, "").replace(/\n?```$/i, "").trim();
+  } catch (err) {
+    logger.warn({ err }, "Gemini script gen failed, trying OpenRouter");
+  }
+
+  try {
+    const key = nextOpenRouterKey();
+    const response = await axios.post(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        model: "openai/gpt-4o-mini",
+        messages: [{ role: "user", content: fullPrompt }],
+      },
+      { headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" } },
+    );
+    const content = response.data?.choices?.[0]?.message?.content ?? "";
+    return content.trim().replace(/^```(?:lua)?\n?/i, "").replace(/\n?```$/i, "").trim();
+  } catch (err) {
+    logger.error({ err }, "OpenRouter script gen also failed");
+    return `--script generate for Dev | https://develol.com\n-- Error al generar el script. Inténtalo de nuevo.`;
+  }
+}
+
 export async function askAI(prompt: string, history: ChatMessage[] = []): Promise<string> {
   try {
     const genai = nextGemini();
