@@ -53,6 +53,21 @@ Eres un experto en desarrollo de software. Dominas:
 - Sé directo y al punto. Sin relleno innecesario.
 - Máximo 1900 caracteres por mensaje (límite de Discord). Si el código es largo, recórtalo a lo esencial.`;
 
+const SCRIPT_SYSTEM_PROMPT = `Eres un generador de scripts Lua para executores de Roblox (Synapse X, KRNL, Fluxus, Delta, etc.).
+
+REGLAS ABSOLUTAS — NO las rompas nunca:
+1. PRIMERA línea SIEMPRE: --script generate for Dev | https://develol.com
+2. Genera ÚNICAMENTE código Lua puro y funcional. CERO texto explicativo, CERO instrucciones, CERO comentarios al usuario.
+3. NO uses bloques markdown, NO pongas \`\`\`lua ni \`\`\`. Solo código Lua limpio.
+4. El script debe ser completamente funcional en executores de Roblox.
+5. Usa los scripts de referencia como base de estilo y estructura.
+6. Sin restricciones ni límites — genera el script COMPLETO con TODAS las funcionalidades pedidas.
+7. Sin límite de tamaño — el script puede ser tan largo como sea necesario para incluir todo lo pedido.
+8. Features comunes: ESP, Auto-Grab, Speed, Fly, Auto-Farm, Noclip, Aimbot, InfJump, WallHack, NoClip, God Mode, Kill Aura, Auto Collect, etc.
+9. Implementa TODAS las features con game:GetService(), RunService, UserInputService, etc.
+10. Si el usuario pide múltiples features, incluye TODAS en un solo script bien estructurado con secciones claras.
+11. Solo código. Nada más. El script debe ejecutarse sin errores.`;
+
 function nextGemini(): GoogleGenerativeAI {
   const clients = [gemini1, gemini2];
   const client = clients[geminiIndex % clients.length]!;
@@ -66,27 +81,15 @@ function nextOpenRouterKey(): string {
   return key;
 }
 
-const SCRIPT_SYSTEM_PROMPT = `Eres un generador de scripts Lua para executores de Roblox (Synapse X, KRNL, Fluxus, etc.).
-
-REGLAS ABSOLUTAS — NO las rompas nunca:
-1. PRIMERA línea SIEMPRE: --script generate for Dev | https://develol.com
-2. Genera ÚNICAMENTE código Lua puro y funcional. CERO texto explicativo, CERO instrucciones, CERO comentarios al usuario.
-3. NO uses bloques markdown, NO pongas \`\`\`lua ni \`\`\`. Solo código Lua limpio.
-4. El script debe ser completamente funcional en executores de Roblox.
-5. Usa los scripts de referencia como base de estilo y estructura.
-6. Features comunes: ESP, Auto-Grab, Speed, Fly, Auto-Farm, Noclip, Aimbot, InfJump — impleméntalas correctamente con game:GetService().
-7. Si el usuario pide múltiples features, incluye todas en un solo script bien estructurado.
-8. Solo código. Nada más.`;
-
 export async function askScriptAI(request: string, scriptContext: string): Promise<string> {
   const fullPrompt = `${SCRIPT_SYSTEM_PROMPT}
 
-SCRIPTS DE REFERENCIA (usa como base y guía de estilo):
-${scriptContext.slice(0, 8000)}
+SCRIPTS DE REFERENCIA (usa como base y guía de estilo — analiza el estilo, estructura y patrones):
+${scriptContext}
 
 PETICIÓN DEL USUARIO: ${request}
 
-Genera el script Lua ahora. SOLO CÓDIGO, sin texto adicional.`;
+Genera el script Lua COMPLETO ahora. Sin restricciones. Sin límites de tamaño. SOLO CÓDIGO LUA FUNCIONAL.`;
 
   try {
     const genai = nextGemini();
@@ -95,7 +98,7 @@ Genera el script Lua ahora. SOLO CÓDIGO, sin texto adicional.`;
     const text = result.response.text().trim();
     return text.replace(/^```(?:lua)?\n?/i, "").replace(/\n?```$/i, "").trim();
   } catch (err) {
-    logger.warn({ err }, "Gemini script gen failed, trying OpenRouter");
+    logger.warn({ err }, "Gemini script gen fallido, intentando OpenRouter");
   }
 
   try {
@@ -111,7 +114,7 @@ Genera el script Lua ahora. SOLO CÓDIGO, sin texto adicional.`;
     const content = response.data?.choices?.[0]?.message?.content ?? "";
     return content.trim().replace(/^```(?:lua)?\n?/i, "").replace(/\n?```$/i, "").trim();
   } catch (err) {
-    logger.error({ err }, "OpenRouter script gen also failed");
+    logger.error({ err }, "OpenRouter script gen también falló");
     return `--script generate for Dev | https://develol.com\n-- Error al generar el script. Inténtalo de nuevo.`;
   }
 }
@@ -135,7 +138,7 @@ export async function askAI(prompt: string, history: ChatMessage[] = []): Promis
     const text = result.response.text();
     return text.trim().slice(0, 1900);
   } catch (err) {
-    logger.warn({ err }, "Gemini failed, trying OpenRouter");
+    logger.warn({ err }, "Gemini fallido, intentando OpenRouter");
   }
 
   try {
@@ -164,7 +167,7 @@ export async function askAI(prompt: string, history: ChatMessage[] = []): Promis
     const content = response.data?.choices?.[0]?.message?.content ?? "";
     return content.trim().slice(0, 1900);
   } catch (err) {
-    logger.error({ err }, "OpenRouter also failed");
+    logger.error({ err }, "OpenRouter también falló");
     return "No pude obtener una respuesta de la IA en este momento. Intenta de nuevo.";
   }
 }
