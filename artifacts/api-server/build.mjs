@@ -106,8 +106,6 @@ async function buildAll() {
       "sodium",
       "libsodium-wrappers",
       "@sodium-friends/grasp-sodium",
-      "@snazzah/davey",
-      "@snazzah/davey-linux-x64-gnu",
       "play-audio",
       "ffmpeg-static",
       "prism-media",
