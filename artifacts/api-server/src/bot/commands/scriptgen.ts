@@ -1,5 +1,5 @@
 import { Message, AttachmentBuilder } from "discord.js";
-import { findRelevantScripts, getScriptCount } from "../scriptStore";
+import { findRelevantScripts, getScriptCount, getAllScripts } from "../scriptStore";
 import { askScriptAI } from "../aiClient";
 
 const SCRIPT_CHANNEL_ID = "1502064878377111773";
@@ -9,6 +9,52 @@ export function isScriptChannel(channelId: string): boolean {
   return channelId === SCRIPT_CHANNEL_ID;
 }
 
+function findBestScript(request: string): string | null {
+  const scripts = getAllScripts();
+  if (scripts.length === 0) return null;
+
+  const keywords = request
+    .toLowerCase()
+    .replace(/[^a-záéíóúña-z0-9\s]/gi, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+
+  let bestScore = 0;
+  let bestContent: string | null = null;
+
+  for (const script of scripts) {
+    const nameLower = script.name.toLowerCase();
+    const contentLower = script.content.toLowerCase();
+    let score = 0;
+    for (const kw of keywords) {
+      if (nameLower.includes(kw)) score += 10;
+      const hits = (contentLower.match(new RegExp(kw, "g")) || []).length;
+      score += Math.min(hits, 5);
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestContent = script.content;
+    }
+  }
+
+  return bestScore > 0 ? bestContent : null;
+}
+
+async function buildScript(request: string): Promise<{ code: string; fromStore: boolean }> {
+  const count = getScriptCount();
+
+  if (count > 0) {
+    const match = findBestScript(request);
+    if (match) {
+      return { code: match, fromStore: true };
+    }
+  }
+
+  const context = findRelevantScripts(request);
+  const aiCode = await askScriptAI(request, context);
+  return { code: aiCode, fromStore: false };
+}
+
 export async function cmdScriptGen(message: Message, args: string[]): Promise<void> {
   if (!message.guild) return;
 
@@ -16,26 +62,22 @@ export async function cmdScriptGen(message: Message, args: string[]): Promise<vo
   if (!request) {
     await message.reply(
       `❌ Uso: \`Dev scriptgen <descripción del script>\`\n` +
-      `📚 Scripts de referencia cargados: **${getScriptCount()}**\n` +
-      `Ejemplo: \`Dev scriptgen ESP + Aimbot + Speed para Blox Fruits\``,
+      `📚 Scripts cargados: **${getScriptCount()}**\n` +
+      `Ejemplo: \`Dev scriptgen ESP + Aimbot para Blox Fruits\``,
     );
     return;
   }
 
   await message.channel.sendTyping().catch(() => {});
 
-  const context = findRelevantScripts(request);
-  const scriptCode = await askScriptAI(request, context);
+  const { code, fromStore } = await buildScript(request);
 
-  const finalScript = scriptCode.startsWith(HEADER)
-    ? scriptCode
-    : `${HEADER}\n\n${scriptCode}`;
-
+  const finalScript = code.startsWith(HEADER) ? code : `${HEADER}\n\n${code}`;
   const buffer = Buffer.from(finalScript, "utf-8");
   const attachment = new AttachmentBuilder(buffer, { name: "script.lua" });
 
   await message.reply({
-    content: `✅ Script generado — **${request.slice(0, 60)}${request.length > 60 ? "..." : ""}**`,
+    content: `✅ Script — **${request.slice(0, 60)}${request.length > 60 ? "..." : ""}**${fromStore ? " *(desde librería)*" : ""}`,
     files: [attachment],
   });
 }
@@ -54,18 +96,14 @@ export async function handleScriptChannel(message: Message): Promise<void> {
 
   await message.channel.sendTyping().catch(() => {});
 
-  const context = findRelevantScripts(request);
-  const scriptCode = await askScriptAI(request, context);
+  const { code, fromStore } = await buildScript(request);
 
-  const finalScript = scriptCode.startsWith(HEADER)
-    ? scriptCode
-    : `${HEADER}\n\n${scriptCode}`;
-
+  const finalScript = code.startsWith(HEADER) ? code : `${HEADER}\n\n${code}`;
   const buffer = Buffer.from(finalScript, "utf-8");
   const attachment = new AttachmentBuilder(buffer, { name: "script.lua" });
 
   await message.reply({
-    content: `✅ Script generado — **${request.slice(0, 60)}${request.length > 60 ? "..." : ""}**`,
+    content: `✅ Script — **${request.slice(0, 60)}${request.length > 60 ? "..." : ""}**${fromStore ? " *(desde librería)*" : ""}`,
     files: [attachment],
   });
 }
