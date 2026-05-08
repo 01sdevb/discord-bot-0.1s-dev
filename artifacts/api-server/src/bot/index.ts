@@ -31,6 +31,7 @@ import { cmdServerEmoji } from "./commands/serveremoji";
 import { cmdServerSticker } from "./commands/serversticker";
 import { cmdPurge } from "./commands/purge";
 import { cmdImg } from "./commands/img";
+import { cmdGen, startGenExpireLoop } from "./commands/gen";
 import { storeMessage, markDeleted, loadMessages, saveMessages } from "./messageStore";
 import { loadTickets } from "./ticketStore";
 import { loadScripts, syncScriptsFromChannel } from "./scriptStore";
@@ -76,6 +77,7 @@ export async function startBot(): Promise<void> {
   client.once(Events.ClientReady, async (c) => {
     logger.info({ tag: c.user.tag }, "Bot de Discord listo");
     initModLogger(client);
+    await startGenExpireLoop(client);
 
     setInterval(() => {
       saveMessages().catch((err) => logger.error({ err }, "Auto-save fallido"));
@@ -170,6 +172,7 @@ export async function startBot(): Promise<void> {
         case "sticker":     { await cmdServerSticker(message, args); break; }
         case "purge":       { await cmdPurge(message, args); break; }
         case "img":         { await cmdImg(message, args); break; }
+        case "gen":         { await cmdGen(message); break; }
 
         case "antispam": {
           await message.reply(
