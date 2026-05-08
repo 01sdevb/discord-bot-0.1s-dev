@@ -25,6 +25,7 @@ import { cmdTimeout } from "./commands/timeout";
 import { cmdTicketpa, handleTicketCreate, handleTicketClose, handleTicketDelete } from "./commands/ticketpa";
 import { cmdAll, isDevAllChannel, handleDevAllChannelUpload } from "./commands/all";
 import { cmdScriptGen, handleScriptChannel, isScriptChannel } from "./commands/scriptgen";
+import { cmdUserBanner } from "./commands/userbanner";
 import { storeMessage, markDeleted, loadMessages, saveMessages } from "./messageStore";
 import { loadTickets } from "./ticketStore";
 import { loadScripts, syncScriptsFromChannel } from "./scriptStore";
@@ -41,6 +42,7 @@ const TWO_WORD_COMMANDS: Record<string, string> = {
   "anti-link": "antilink",
   "anti-spam": "antispam",
   "warn clear": "warnclear",
+  "user banner": "userbanner",
 };
 
 export async function startBot(): Promise<void> {
@@ -156,6 +158,7 @@ export async function startBot(): Promise<void> {
         case "sg":          { await cmdScriptGen(message, args); break; }
         case "conversacion":
         case "con":         { await cmdConversacion(message, args); break; }
+        case "userbanner":  { await cmdUserBanner(message, args); break; }
 
         case "antispam": {
           await message.reply(

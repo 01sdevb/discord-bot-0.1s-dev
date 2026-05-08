@@ -51,6 +51,7 @@ export async function cmdHelp(message: Message): Promise<void> {
         name: "🖼️ Perfil",
         value: [
           "`Dev avatar [@usuario]` — Ver avatar propio o de otro",
+          "`Dev user banner [@usuario]` — Ver banner propio o de otro usuario",
           "`Dev av <url>` — Cambiar avatar del bot (admins)",
           "`Dev banner <url>` — Cambiar banner del bot (owner 👑)",
         ].join("\n"),
