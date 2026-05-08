@@ -36,6 +36,16 @@ export async function cmdHelp(message: Message): Promise<void> {
           "`Dev kick @usuario [razón]` — Expulsar",
           "`Dev unban <ID>` — Desbanear por ID",
           "`Dev timeout @usuario 1d [razón]` — Timeout personalizado (1d, 6h, 30m...)",
+          "`Dev lock` — Bloquear canal (solo admins)",
+          "`Dev unlock` — Desbloquear canal y restaurar permisos (solo admins)",
+        ].join("\n"),
+      },
+      {
+        name: "😄 Emojis & Stickers",
+        value: [
+          "`Dev emoji [nombre]` — *Responde* a un sticker/emoji/gif/imagen → sube como emoji",
+          "`Dev sticker [nombre]` — *Responde* a un sticker/imagen PNG/GIF → sube como sticker",
+          "> Requiere permiso **Gestionar Emojis y Stickers**.",
         ].join("\n"),
       },
       {

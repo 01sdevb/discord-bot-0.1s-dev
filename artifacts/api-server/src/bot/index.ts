@@ -26,6 +26,9 @@ import { cmdTicketpa, handleTicketCreate, handleTicketClose, handleTicketDelete 
 import { cmdAll, isDevAllChannel, handleDevAllChannelUpload } from "./commands/all";
 import { cmdScriptGen, handleScriptChannel, isScriptChannel } from "./commands/scriptgen";
 import { cmdUserBanner } from "./commands/userbanner";
+import { cmdLock, cmdUnlock } from "./commands/lock";
+import { cmdServerEmoji } from "./commands/serveremoji";
+import { cmdServerSticker } from "./commands/serversticker";
 import { storeMessage, markDeleted, loadMessages, saveMessages } from "./messageStore";
 import { loadTickets } from "./ticketStore";
 import { loadScripts, syncScriptsFromChannel } from "./scriptStore";
@@ -159,6 +162,10 @@ export async function startBot(): Promise<void> {
         case "conversacion":
         case "con":         { await cmdConversacion(message, args); break; }
         case "userbanner":  { await cmdUserBanner(message, args); break; }
+        case "lock":        { await cmdLock(message); break; }
+        case "unlock":      { await cmdUnlock(message); break; }
+        case "emoji":       { await cmdServerEmoji(message, args); break; }
+        case "sticker":     { await cmdServerSticker(message, args); break; }
 
         case "antispam": {
           await message.reply(
