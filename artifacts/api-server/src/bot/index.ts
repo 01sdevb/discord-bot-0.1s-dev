@@ -33,7 +33,7 @@ import { cmdPurge } from "./commands/purge";
 import { cmdImg } from "./commands/img";
 import { cmdGen, cmdServers, startGenExpireLoop } from "./commands/gen";
 import { cmdVd } from "./commands/vd";
-import { cmdPlay, cmdStop, cmdReplay, cmdList } from "./commands/music";
+import { cmdPlay, cmdStop, cmdReplay, cmdList, cmdSkip } from "./commands/music";
 import { storeMessage, markDeleted, loadMessages, saveMessages } from "./messageStore";
 import { loadTickets } from "./ticketStore";
 import { loadScripts, syncScriptsFromChannel } from "./scriptStore";
@@ -182,6 +182,7 @@ export async function startBot(): Promise<void> {
         case "stop":        { await cmdStop(message); break; }
         case "replay":      { await cmdReplay(message); break; }
         case "list":        { await cmdList(message); break; }
+        case "skip":        { await cmdSkip(message); break; }
 
         case "antispam": {
           await message.reply(
