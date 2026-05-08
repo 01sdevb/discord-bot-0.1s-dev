@@ -29,14 +29,17 @@ export async function handleAntiLink(message: Message): Promise<void> {
   const matches = message.content.match(URL_REGEX);
   if (!matches) return;
 
-  const linkType = matches[0]!.startsWith("discord") ? "Discord invite" : matches[0]!.startsWith("http") ? "URL" : "enlace";
+  const linkType = matches[0]!.startsWith("discord")
+    ? "Discord invite"
+    : matches[0]!.startsWith("http")
+    ? "URL"
+    : "enlace";
 
   try {
     await message.delete();
     const channel = message.channel as TextChannel;
     await channel.send(
-      `🚫 **Link eliminado** | Enviado por: **${message.author.tag}** | Tipo: \`${linkType}\` | Contenido: \`${matches[0]}\``,
+      `🚫 **Link eliminado** | Enviado por: **${message.author.tag}** | Tipo: \`${linkType}\``
     );
-  } catch {
-  }
+  } catch {}
 }
