@@ -26,6 +26,7 @@ interface CachedSearch {
 }
 
 let _player: Player | null = null;
+let _extractorsReady = false;
 const searchCache = new Map<string, CachedSearch>();
 
 setInterval(() => {
@@ -108,7 +109,14 @@ export function initMusicPlayer(client: Client): void {
     skipFFmpeg: false,
   });
 
-  void _player.extractors.loadMulti(DefaultExtractors);
+  _player.extractors.loadMulti(DefaultExtractors)
+    .then(() => {
+      _extractorsReady = true;
+      logger.info("Extractors de música cargados (YouTube listo)");
+    })
+    .catch((err) => {
+      logger.error({ err }, "Error cargando extractors — música no disponible");
+    });
 
   _player.events.on("playerStart", async (queue, track) => {
     const meta = (queue as GuildQueue<QueueMeta>).metadata;
@@ -174,8 +182,8 @@ export async function cmdPlay(message: Message, args: string[]): Promise<void> {
   if (!message.guild) return;
 
   const p = _player;
-  if (!p) {
-    await message.reply("❌ El sistema de música no está inicializado. Reinicia el bot.");
+  if (!p || !_extractorsReady) {
+    await message.reply("⏳ El sistema de música todavía está cargando, espera unos segundos e inténtalo de nuevo.");
     return;
   }
 
