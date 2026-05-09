@@ -33,7 +33,14 @@ import { cmdPurge } from "./commands/purge";
 import { cmdImg } from "./commands/img";
 import { cmdGen, cmdServers, startGenExpireLoop } from "./commands/gen";
 import { cmdVd } from "./commands/vd";
-import { cmdPlay, cmdStop, cmdReplay, cmdList, cmdSkip } from "./commands/music";
+import {
+  cmdPlay,
+  cmdStop,
+  cmdReplay,
+  cmdList,
+  cmdSkip,
+  handleMusicButton,
+} from "./commands/music";
 import { storeMessage, markDeleted, loadMessages, saveMessages } from "./messageStore";
 import { loadTickets } from "./ticketStore";
 import { loadScripts, syncScriptsFromChannel } from "./scriptStore";
@@ -58,6 +65,17 @@ export async function startBot(): Promise<void> {
   if (!token) {
     logger.error("DISCORD_BOT_TOKEN no está configurado.");
     return;
+  }
+
+  // Set ffmpeg path so @discordjs/voice can find it for audio processing
+  try {
+    const { default: ffmpegPath } = await import("ffmpeg-static");
+    if (ffmpegPath) {
+      process.env["FFMPEG_PATH"] = ffmpegPath;
+      logger.info({ ffmpegPath }, "ffmpeg-static path configured");
+    }
+  } catch {
+    logger.warn("ffmpeg-static not found — music may not work correctly");
   }
 
   await loadMessages();
@@ -212,8 +230,11 @@ export async function startBot(): Promise<void> {
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
     if (!interaction.isButton()) return;
     const btn = interaction as ButtonInteraction;
+
     try {
-      if (btn.customId.startsWith("ticketCreate_")) {
+      if (btn.customId.startsWith("music_")) {
+        await handleMusicButton(btn);
+      } else if (btn.customId.startsWith("ticketCreate_")) {
         await handleTicketCreate(btn);
       } else if (btn.customId.startsWith("ticketClose_")) {
         await handleTicketClose(btn);
