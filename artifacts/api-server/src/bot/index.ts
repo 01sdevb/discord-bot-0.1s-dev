@@ -40,6 +40,7 @@ import {
   cmdList,
   cmdSkip,
   handleMusicButton,
+  initMusicPlayer,
 } from "./commands/music";
 import { storeMessage, markDeleted, loadMessages, saveMessages } from "./messageStore";
 import { loadTickets } from "./ticketStore";
@@ -94,6 +95,8 @@ export async function startBot(): Promise<void> {
     ],
     partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
   });
+
+  initMusicPlayer(client);
 
   client.once(Events.ClientReady, async (c) => {
     logger.info({ tag: c.user.tag }, "Bot de Discord listo");
