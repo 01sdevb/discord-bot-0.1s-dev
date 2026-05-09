@@ -14,13 +14,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
+      - name: Trigger Railway deployment
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          echo "🚀 Triggering Railway deployment..."
-          railway up --service "api-server" --detach
-          echo "✅ Deploy triggered successfully"
+          SERVICE_ID="b6b54fdb-16cd-4b5c-8bb8-138c2b884334"
+          ENV_ID="1dd6de68-2d71-4eed-852a-c4729afb3922"
+
+          echo "🚀 Triggering Railway deployment for latest commit..."
+
+          RESPONSE=$(curl -s -X POST "https://backboard.railway.app/graphql/v2" \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"mutation { serviceInstanceDeployV2(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") }\"}")
+
+          echo "Response: $RESPONSE"
+
+          if echo "$RESPONSE" | grep -q '"errors"'; then
+            echo "❌ Deploy API returned errors"
+            exit 1
+          fi
+
+          echo "✅ Deploy triggered successfully — Railway will build and deploy the latest commit"
