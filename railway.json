@@ -1,8 +1,8 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "DOCKERFILE",
-    "dockerfilePath": "Dockerfile"
+    "builder": "NIXPACKS",
+    "buildCommand": "npm install -g pnpm && pnpm config set shamefully-hoist true && pnpm install --no-frozen-lockfile && pnpm --filter @workspace/api-server run build"
   },
   "deploy": {
     "startCommand": "pnpm --filter @workspace/api-server run start",
